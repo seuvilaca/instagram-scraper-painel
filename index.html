@@ -456,9 +456,14 @@ function resetUI(btn) {
 
 // ── Init ───────────────────────────────────────────────────
 ;(function init() {
-  // Garante estrutura mínima no localStorage
   const c = cfg()
-  saveCfg(c)
+  let changed = false
+  // Pré-carrega webhook URL se ainda não configurado
+  if (!c.webhookUrl) {
+    c.webhookUrl = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-scraper'
+    changed = true
+  }
+  if (changed) saveCfg(c)
 })()
 </script>
 </body>
