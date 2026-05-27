@@ -1,0 +1,202 @@
+{
+  "name": "Instagram Scraper + Gemini + Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-scraper",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst profile = (body.profile || '').replace(/^@/, '').trim();\nconst posts = parseInt(body.posts) || 100;\nconst apifyKey = body.apifyKey || '';\nconst geminiKey = body.geminiKey || '';\nconst sheetId = body.sheetId || '';\n\nif (!profile) throw new Error('profile is required');\nif (!apifyKey) throw new Error('apifyKey is required');\nif (!geminiKey) throw new Error('geminiKey is required');\nif (!sheetId) throw new Error('sheetId is required - configure no painel admin');\n\nreturn [{ json: { profile, posts, apifyKey, geminiKey, sheetId } }];"
+      },
+      "id": "node-validate",
+      "name": "Validar Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync-get-dataset-items?token={{ $json.apifyKey }}&waitSecs=300",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"username\": [\"{{ $json.profile }}\"],\n  \"resultsLimit\": {{ $json.posts }},\n  \"dataDetailLevel\": \"basicData\",\n  \"skipPinnedPosts\": false\n}",
+        "options": {
+          "timeout": 310000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "node-apify",
+      "name": "Apify - Coletar Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verifica se Apify retornou erro de crédito\nconst response = $input.first();\nconst statusCode = response.json.statusCode;\n\nif (statusCode === 402) {\n  throw new Error('APIFY_CREDIT_EXHAUSTED');\n}\n\nconst posts = Array.isArray(response.json.body) ? response.json.body : response.json;\nif (!Array.isArray(posts) || posts.length === 0) {\n  throw new Error('Nenhum post coletado. Verifique o perfil.');\n}\n\n// Recupera as variáveis do nó anterior via $('Validar Input')\nconst vars = $('Validar Input').first().json;\n\n// Mapeia tipo de post\nfunction fmt(type) {\n  if (type === 'Video') return 'Reels';\n  if (type === 'Image') return 'Foto';\n  if (type === 'Sidecar') return 'Carrossel';\n  return type || 'Foto';\n}\n\n// Formata data\nfunction fmtDate(ts) {\n  if (!ts) return '';\n  return new Date(ts).toLocaleDateString('pt-BR');\n}\n\n// Sanitiza legenda (remove quebras, trunca 200 chars)\nfunction fmtLegenda(cap) {\n  if (!cap) return '';\n  return cap.replace(/[\\r\\n]+/g, ' ').trim().substring(0, 200) + (cap.length > 200 ? '...' : '');\n}\n\nconst rows = posts.map(p => ({\n  perfil: p.ownerUsername || vars.profile,\n  link: p.url || '',\n  formato: fmt(p.type),\n  data: fmtDate(p.timestamp),\n  curtidas: p.likesCount !== null && p.likesCount !== undefined ? String(p.likesCount) : 'Oculto',\n  comentarios: String(p.commentsCount || 0),\n  legenda: fmtLegenda(p.caption)\n}));\n\nreturn [{ json: { rows, geminiKey: vars.geminiKey, profile: vars.profile, postsCount: rows.length } }];"
+      },
+      "id": "node-map",
+      "name": "Mapear Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara prompt para Gemini classificar todos os posts de uma vez\nconst { rows, geminiKey, profile, postsCount } = $input.first().json;\n\nconst legends = rows.map((r, i) => `[${i+1}] Perfil: ${r.perfil} | Formato: ${r.formato} | Legenda: \"${r.legenda || '(sem legenda)'}\"`);\n\nconst prompt = `Você é especialista em análise de conteúdo de escolas católicas brasileiras no Instagram.\n\nAnalise os ${rows.length} posts abaixo e classifique cada um com:\n- tema: categoria principal (seja específico, ex: \"Coroação de Nossa Senhora / Espiritualidade\", \"Dia das Mães / Homenagem das turmas\", \"Atividade pedagógica / Disciplina escolar\", \"Natal / Espiritualidade\", \"Formação docente / Educação Católica\", etc.)\n- tom: como o conteúdo se comunica (ex: \"Devocional e celebratório\", \"Afetivo e emotivo\", \"Institucional e informativo\", \"Educativo e lúdico\", etc.)\n\nRetorne SOMENTE um array JSON válido com ${rows.length} objetos {\"tema\":\"...\",\"tom\":\"...\"}, na mesma ordem dos posts. Sem texto adicional.\n\nPosts:\n${legends.join('\\n')}`;\n\nreturn [{ json: { prompt, rows, geminiKey, profile, postsCount } }];"
+      },
+      "id": "node-prompt",
+      "name": "Preparar Prompt Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $json.geminiKey }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{ \"text\": {{ JSON.stringify($json.prompt) }} }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "node-gemini",
+      "name": "Gemini - Classificar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parseia resposta do Gemini e mescla com os posts\nconst geminiResponse = $input.first().json;\nconst { rows, profile, postsCount } = $('Preparar Prompt Gemini').first().json;\n\nlet classifications = [];\ntry {\n  const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\n  classifications = JSON.parse(text);\n} catch(e) {\n  // Fallback: classifica tudo como genérico se Gemini falhar\n  classifications = rows.map(() => ({ tema: 'Atividade escolar / Vida escolar', tom: 'Informativo e institucional' }));\n}\n\n// Garante que temos classificação para todos os posts\nconst finalRows = rows.map((r, i) => ({\n  Perfil: r.perfil,\n  Link: r.link,\n  Formato: r.formato,\n  Data: r.data,\n  Curtidas: r.curtidas,\n  Comentarios: r.comentarios,\n  Legenda: r.legenda,\n  Tema: classifications[i]?.tema || 'Sem classificação',\n  Tom_de_Voz: classifications[i]?.tom || '—'\n}));\n\nreturn finalRows.map(row => ({ json: row }));"
+      },
+      "id": "node-merge",
+      "name": "Mesclar Resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Validar Input').first().json.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "node-sheets",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1740, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sheetId = $('Validar Input').first().json.sheetId;\nconst postsCount = $input.all().length;\nreturn [{ json: {\n  sheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/edit`,\n  postsCount,\n  status: 'success'\n}}];"
+      },
+      "id": "node-result",
+      "name": "Montar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "node-respond",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2180, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.message || $json.error, message: $json.message }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "node-error-respond",
+      "name": "Responder Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [860, 520]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+    },
+    "Validar Input": {
+      "main": [[{ "node": "Apify - Coletar Posts", "type": "main", "index": 0 }]]
+    },
+    "Apify - Coletar Posts": {
+      "main": [[{ "node": "Mapear Posts", "type": "main", "index": 0 }]]
+    },
+    "Mapear Posts": {
+      "main": [[{ "node": "Preparar Prompt Gemini", "type": "main", "index": 0 }]]
+    },
+    "Preparar Prompt Gemini": {
+      "main": [[{ "node": "Gemini - Classificar", "type": "main", "index": 0 }]]
+    },
+    "Gemini - Classificar": {
+      "main": [[{ "node": "Mesclar Resultados", "type": "main", "index": 0 }]]
+    },
+    "Mesclar Resultados": {
+      "main": [[{ "node": "Google Sheets", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets": {
+      "main": [[{ "node": "Montar Resposta", "type": "main", "index": 0 }]]
+    },
+    "Montar Resposta": {
+      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [{ "name": "instagram-scraper" }]
+}
