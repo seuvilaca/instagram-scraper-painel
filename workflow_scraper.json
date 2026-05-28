@@ -1,0 +1,239 @@
+{
+  "name": "Instagram Scraper v2 - Por Perfil",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-scraper-v2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "s-node-01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst required = ['projectName','profile','posts','apifyKey','geminiKey'];\nfor (const f of required) { if (!b[f]) throw new Error('Campo obrigatorio: ' + f); }\nb.posts = Math.min(parseInt(b.posts) || 12, 100);\nb.handle = (b.profile || '').replace(/^@/, '').trim();\nb.profile = b.handle;\nif (!b.handle) throw new Error('profile invalido');\nreturn [{ json: b }];"
+      },
+      "id": "s-node-02",
+      "name": "Validar Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync-get-dataset-items?token={{ $json.apifyKey }}&waitSecs=300",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"username\": [\"{{ $json.profile }}\"],\n  \"resultsLimit\": {{ $json.posts }},\n  \"dataDetailLevel\": \"basicData\",\n  \"skipPinnedPosts\": false\n}",
+        "options": {
+          "timeout": 310000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "s-node-03",
+      "name": "Apify - Coletar Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first();\nconst statusCode = response.json.statusCode;\nif (statusCode === 402) throw new Error('APIFY_CREDIT_EXHAUSTED');\n\nconst posts = Array.isArray(response.json.body) ? response.json.body : response.json;\nif (!Array.isArray(posts) || posts.length === 0) throw new Error('Nenhum post coletado. Verifique o perfil.');\n\nconst vars = $('Validar Input').first().json;\nconst followerCount = posts[0]?.ownerFollowersCount || posts[0]?.followersCount || 0;\n\nfunction fmt(type) {\n  if (type === 'Video') return 'Reels';\n  if (type === 'Image') return 'Foto';\n  if (type === 'Sidecar') return 'Carrossel';\n  return type || 'Foto';\n}\nfunction fmtDate(ts) {\n  if (!ts) return '';\n  return new Date(ts).toLocaleDateString('pt-BR');\n}\nfunction fmtLegenda(cap) {\n  if (!cap) return '';\n  return cap.replace(/[\\r\\n]+/g, ' ').trim().substring(0, 200) + (cap.length > 200 ? '...' : '');\n}\n\nconst rows = posts.map(p => ({\n  perfil: p.ownerUsername || vars.profile,\n  link: p.url || '',\n  formato: fmt(p.type),\n  data: fmtDate(p.timestamp),\n  curtidas: (p.likesCount !== null && p.likesCount !== undefined) ? String(p.likesCount) : 'Oculto',\n  comentarios: String(p.commentsCount || 0),\n  legenda: fmtLegenda(p.caption)\n}));\n\nreturn [{ json: { rows, geminiKey: vars.geminiKey, profile: vars.profile, projectName: vars.projectName, postsCount: rows.length, followerCount } }];"
+      },
+      "id": "s-node-04",
+      "name": "Mapear Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { rows, geminiKey, profile, projectName, postsCount, followerCount } = $input.first().json;\n\nconst legends = rows.map((r, i) => `[${i+1}] Perfil: ${r.perfil} | Formato: ${r.formato} | Legenda: \"${r.legenda || '(sem legenda)'}\"`);\n\nconst prompt = `Você é especialista em análise de conteúdo de marcas e negócios no Instagram.\\n\\nAnalise os ${rows.length} posts abaixo e classifique cada um com:\\n- tema: categoria principal do conteúdo (seja específico e descritivo, ex: \\\"Apresentação de produto / Lançamento\\\", \\\"Bastidores / Cultura da empresa\\\", \\\"Depoimento de cliente / Prova social\\\", \\\"Dica educativa / Conteúdo de valor\\\", \\\"Promoção / Oferta especial\\\", \\\"Evento / Celebração\\\", etc.)\\n- tom: como o conteúdo se comunica (ex: \\\"Inspiracional e motivacional\\\", \\\"Informativo e educativo\\\", \\\"Emocional e afetivo\\\", \\\"Comercial e persuasivo\\\", \\\"Descontraído e bem-humorado\\\", etc.)\\n\\nRetorne SOMENTE um array JSON válido com ${rows.length} objetos {\\\"tema\\\":\\\"...\\\",\\\"tom\\\":\\\"...\\\"}, na mesma ordem dos posts. Sem texto adicional.\\n\\nPosts:\\n${legends.join('\\\\n')}`;\n\nreturn [{ json: { prompt, rows, geminiKey, profile, projectName, postsCount, followerCount } }];"
+      },
+      "id": "s-node-05",
+      "name": "Preparar Prompt Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $json.geminiKey }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{ \"text\": {{ JSON.stringify($json.prompt) }} }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "s-node-06",
+      "name": "Gemini - Classificar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const geminiResponse = $input.first().json;\nconst { rows, profile, projectName, postsCount, followerCount } = $('Preparar Prompt Gemini').first().json;\n\nlet classifications = [];\ntry {\n  const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\n  classifications = JSON.parse(text);\n} catch(e) {\n  classifications = rows.map(() => ({ tema: 'Conteúdo geral', tom: 'Informativo' }));\n}\n\nconst finalRows = rows.map((r, i) => ({\n  Perfil: r.perfil,\n  Link: r.link,\n  Formato: r.formato,\n  Data: r.data,\n  Curtidas: r.curtidas,\n  Comentarios: r.comentarios,\n  Legenda: r.legenda,\n  Tema: classifications[i]?.tema || 'Sem classificação',\n  Tom_de_Voz: classifications[i]?.tom || '—',\n  _projectName: projectName,\n  _followerCount: followerCount\n}));\n\nreturn finalRows.map(row => ({ json: row }));"
+      },
+      "id": "s-node-07",
+      "name": "Mesclar Resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst rows = items.map(item => ({\n  Perfil: item.json.Perfil,\n  Link: item.json.Link,\n  Formato: item.json.Formato,\n  Data: item.json.Data,\n  Curtidas: item.json.Curtidas,\n  Comentarios: item.json.Comentarios,\n  Legenda: item.json.Legenda,\n  Tema: item.json.Tema,\n  Tom_de_Voz: item.json.Tom_de_Voz\n}));\n\nconst vars = $('Validar Input').first().json;\nconst mapPosts = $('Mapear Posts').first().json;\nconst handle = vars.handle;\nconst projectName = vars.projectName;\nconst followerCount = mapPosts.followerCount || 0;\nconst postsCount = rows.length;\n\nconst today = new Date();\nconst datePart = today.toLocaleDateString('pt-BR').replace(/\\//g, '-');\nconst sheetTitle = '@' + handle + ' · ' + projectName + ' · ' + datePart;\n\nreturn [{ json: { rows, handle, projectName, postsCount, followerCount, sheetTitle } }];"
+      },
+      "id": "s-node-08",
+      "name": "Agregar Linhas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1740, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sheets.googleapis.com/v4/spreadsheets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": { \"title\": {{ JSON.stringify($json.sheetTitle) }} },\n  \"sheets\": [{\n    \"properties\": {\n      \"title\": \"Posts\",\n      \"gridProperties\": { \"frozenRowCount\": 1 }\n    }\n  }]\n}",
+        "options": {}
+      },
+      "id": "s-node-09",
+      "name": "Criar Planilha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sCZUDnU1y3KM3yIy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sheet = $input.first().json;\nconst agg = $('Agregar Linhas').first().json;\n\nconst spreadsheetId = sheet.spreadsheetId;\nconst spreadsheetUrl = sheet.spreadsheetUrl || ('https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit');\n\nconst headers = ['Perfil', 'Link', 'Formato', 'Data', 'Curtidas', 'Comentários', 'Legenda', 'Tema', 'Tom de Voz'];\nconst valueRows = agg.rows.map(r => [\n  r.Perfil || '',\n  r.Link || '',\n  r.Formato || '',\n  r.Data || '',\n  r.Curtidas || '',\n  r.Comentarios || '',\n  r.Legenda || '',\n  r.Tema || '',\n  r.Tom_de_Voz || ''\n]);\nconst values = [headers, ...valueRows];\n\nreturn [{ json: {\n  spreadsheetId,\n  spreadsheetUrl,\n  valuesBody: { values },\n  handle: agg.handle,\n  projectName: agg.projectName,\n  postsCount: agg.postsCount,\n  followerCount: agg.followerCount,\n  rows: agg.rows\n} }];"
+      },
+      "id": "s-node-10",
+      "name": "Preparar Dados Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2180, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}/values/Posts!A1?valueInputOption=RAW",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.valuesBody) }}",
+        "options": {}
+      },
+      "id": "s-node-11",
+      "name": "Escrever na Planilha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sCZUDnU1y3KM3yIy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Preparar Dados Sheet').first().json;\nreturn [{ json: {\n  status: 'success',\n  handle: prev.handle,\n  sheetId: prev.spreadsheetId,\n  sheetUrl: prev.spreadsheetUrl,\n  postsCount: prev.postsCount,\n  followerCount: prev.followerCount,\n  rows: prev.rows\n} }];"
+      },
+      "id": "s-node-12",
+      "name": "Montar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2620, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "s-node-13",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2840, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: true, message: $json.message || 'Erro interno' }) }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "s-node-err",
+      "name": "Responder Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [860, 520]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+    },
+    "Validar Input": {
+      "main": [[{ "node": "Apify - Coletar Posts", "type": "main", "index": 0 }]]
+    },
+    "Apify - Coletar Posts": {
+      "main": [[{ "node": "Mapear Posts", "type": "main", "index": 0 }]]
+    },
+    "Mapear Posts": {
+      "main": [[{ "node": "Preparar Prompt Gemini", "type": "main", "index": 0 }]]
+    },
+    "Preparar Prompt Gemini": {
+      "main": [[{ "node": "Gemini - Classificar", "type": "main", "index": 0 }]]
+    },
+    "Gemini - Classificar": {
+      "main": [[{ "node": "Mesclar Resultados", "type": "main", "index": 0 }]]
+    },
+    "Mesclar Resultados": {
+      "main": [[{ "node": "Agregar Linhas", "type": "main", "index": 0 }]]
+    },
+    "Agregar Linhas": {
+      "main": [[{ "node": "Criar Planilha", "type": "main", "index": 0 }]]
+    },
+    "Criar Planilha": {
+      "main": [[{ "node": "Preparar Dados Sheet", "type": "main", "index": 0 }]]
+    },
+    "Preparar Dados Sheet": {
+      "main": [[{ "node": "Escrever na Planilha", "type": "main", "index": 0 }]]
+    },
+    "Escrever na Planilha": {
+      "main": [[{ "node": "Montar Resposta", "type": "main", "index": 0 }]]
+    },
+    "Montar Resposta": {
+      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  }
+}

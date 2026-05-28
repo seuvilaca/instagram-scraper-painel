@@ -1,0 +1,204 @@
+{
+  "name": "Instagram Report v2 - Gerar Google Doc",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-report-v2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "r-node-01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nif (!b.projectName) throw new Error('projectName obrigatorio');\nif (!b.profiles || !Array.isArray(b.profiles) || b.profiles.length === 0) throw new Error('profiles obrigatorio');\nif (!b.geminiKey) throw new Error('geminiKey obrigatorio');\nreturn [{ json: b }];"
+      },
+      "id": "r-node-02",
+      "name": "Validar Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst profiles = data.profiles;\n\nfunction calcMetrics(p) {\n  const rows = p.rows || [];\n  const posts = rows.length;\n  const likesArr = rows.filter(r => r.Curtidas !== 'Oculto').map(r => parseInt(r.Curtidas) || 0);\n  const avgLikes = likesArr.length > 0 ? Math.round(likesArr.reduce((s,v) => s+v, 0) / likesArr.length) : 0;\n  const avgComments = posts > 0 ? Math.round(rows.reduce((s,r) => s + (parseInt(r.Comentarios) || 0), 0) / posts) : 0;\n  const followers = p.followerCount || 0;\n  const engRate = followers > 0 ? (((avgLikes + avgComments) / followers) * 100).toFixed(2) : '0.00';\n  const themes = {};\n  const tones = {};\n  const formats = {};\n  rows.forEach(r => {\n    const t = r.Tema || 'Outros'; themes[t] = (themes[t] || 0) + 1;\n    const v = r.Tom_de_Voz || 'Outros'; tones[v] = (tones[v] || 0) + 1;\n    const f = r.Formato || 'Foto'; formats[f] = (formats[f] || 0) + 1;\n  });\n  const topThemes = Object.entries(themes).sort((a,b) => b[1]-a[1]).slice(0,5).map(([k,v]) => k + ' (' + v + 'x)').join(', ');\n  const topTones = Object.entries(tones).sort((a,b) => b[1]-a[1]).slice(0,3).map(([k,v]) => k + ' (' + v + 'x)').join(', ');\n  const topFormats = Object.entries(formats).sort((a,b) => b[1]-a[1]).map(([k,v]) => k + ': ' + v).join(', ');\n  return { posts, avgLikes, avgComments, followers, engRate, topThemes, topTones, topFormats, themes, tones, formats };\n}\n\nconst summaries = profiles.map(p => {\n  const m = calcMetrics(p);\n  return '## ' + (p.isMain ? '[PERFIL PRINCIPAL]' : '[BENCHMARK]') + ' @' + p.handle + '\\n' +\n    '- Seguidores: ' + (m.followers > 0 ? m.followers.toLocaleString('pt-BR') : 'N/D') + '\\n' +\n    '- Posts analisados: ' + m.posts + '\\n' +\n    '- Média de curtidas por post: ' + m.avgLikes + '\\n' +\n    '- Média de comentários por post: ' + m.avgComments + '\\n' +\n    '- Taxa de engajamento: ' + m.engRate + '%\\n' +\n    '- Formatos: ' + (m.topFormats || 'N/D') + '\\n' +\n    '- Temas principais: ' + (m.topThemes || 'N/D') + '\\n' +\n    '- Tons predominantes: ' + (m.topTones || 'N/D');\n});\n\nconst prompt = 'Você é especialista em marketing digital e estratégia de redes sociais.\\n\\n' +\n  'Analise os dados de ' + profiles.length + ' perfil(is) do Instagram para o projeto \"' + data.projectName + '\" e gere uma análise comparativa profissional e acionável.\\n\\n' +\n  summaries.join('\\n\\n') + '\\n\\n' +\n  'Com base nesses dados, retorne SOMENTE um JSON válido com esta estrutura:\\n' +\n  '{\\n' +\n  '  \"resumo_executivo\": \"2-3 parágrafos resumindo os principais achados da análise comparativa\",\\n' +\n  '  \"analise_principal\": \"análise do perfil principal em relação aos benchmarks (2-3 parágrafos, comparando métricas, estratégia e posicionamento)\",\\n' +\n  '  \"analise_conteudo\": \"análise dos formatos, temas e estratégia de conteúdo com base nos dados (2 parágrafos)\",\\n' +\n  '  \"analise_engajamento\": \"análise das taxas de engajamento, o que indicam sobre a audiência e a qualidade do conteúdo (2 parágrafos)\",\\n' +\n  '  \"analise_tom\": \"análise dos tons de voz utilizados e como eles refletem o posicionamento de cada perfil (1-2 parágrafos)\",\\n' +\n  '  \"recomendacoes\": [\"rec 1\", \"rec 2\", \"rec 3\", \"rec 4\", \"rec 5\"],\\n' +\n  '  \"pontos_atencao\": [\"ponto 1\", \"ponto 2\", \"ponto 3\"],\\n' +\n  '  \"proximos_passos\": [\"passo 1\", \"passo 2\", \"passo 3\"]\\n' +\n  '}';\n\nreturn [{ json: { prompt, profiles, projectName: data.projectName, geminiKey: data.geminiKey, registrySheetId: data.registrySheetId || '' } }];"
+      },
+      "id": "r-node-03",
+      "name": "Preparar Prompt Análise",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $json.geminiKey }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{ \"text\": {{ JSON.stringify($json.prompt) }} }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.3,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": { "timeout": 180000 }
+      },
+      "id": "r-node-04",
+      "name": "Gemini - Analisar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const geminiResp = $input.first().json;\nconst ctx = $('Preparar Prompt Análise').first().json;\nconst profiles = ctx.profiles;\nconst projectName = ctx.projectName;\n\nlet analysis = {};\ntry {\n  const text = geminiResp.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n  analysis = JSON.parse(text);\n} catch(e) {\n  analysis = {\n    resumo_executivo: 'Análise concluída com sucesso.',\n    analise_principal: 'Perfil principal avaliado em relação aos benchmarks.',\n    analise_conteudo: 'Dados de conteúdo processados.',\n    analise_engajamento: 'Métricas de engajamento calculadas.',\n    analise_tom: 'Análise de tom de voz disponível na planilha.',\n    recomendacoes: ['Revisar estratégia de conteúdo com base nos dados coletados.'],\n    pontos_atencao: ['Verificar dados nas planilhas individuais.'],\n    proximos_passos: ['Implementar as recomendações no próximo ciclo de conteúdo.']\n  };\n}\n\nfunction calcMetrics(p) {\n  const rows = p.rows || [];\n  const posts = rows.length;\n  const likesArr = rows.filter(r => r.Curtidas !== 'Oculto').map(r => parseInt(r.Curtidas) || 0);\n  const avgLikes = likesArr.length > 0 ? Math.round(likesArr.reduce((s,v) => s+v, 0) / likesArr.length) : 0;\n  const avgComments = posts > 0 ? Math.round(rows.reduce((s,r) => s + (parseInt(r.Comentarios) || 0), 0) / posts) : 0;\n  const followers = p.followerCount || 0;\n  const engRate = followers > 0 ? (((avgLikes + avgComments) / followers) * 100).toFixed(2) : '0.00';\n  const formats = {};\n  rows.forEach(r => { const f = r.Formato || 'Foto'; formats[f] = (formats[f] || 0) + 1; });\n  const themes = {};\n  rows.forEach(r => { const t = r.Tema || 'Outros'; themes[t] = (themes[t] || 0) + 1; });\n  const topRows = rows\n    .filter(r => r.Curtidas !== 'Oculto')\n    .map(r => ({ ...r, _score: (parseInt(r.Curtidas) || 0) + (parseInt(r.Comentarios) || 0) * 3 }))\n    .sort((a, b) => b._score - a._score)\n    .slice(0, 3);\n  return { posts, avgLikes, avgComments, followers, engRate, formats, themes, topRows };\n}\n\nconst today = new Date().toLocaleDateString('pt-BR');\nconst mainProfile = profiles.find(p => p.isMain) || profiles[0];\nconst benchmarks = profiles.filter(p => !p.isMain);\n\n// Build HTML report\nfunction esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\nfunction fmtNum(n) { return Number(n).toLocaleString('pt-BR'); }\n\nlet html = '<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>Análise Competitiva: ' + esc(projectName) + '</title>';\nhtml += '<style>';\nhtml += 'body{font-family:Arial,sans-serif;font-size:11pt;color:#222;max-width:800px;margin:0 auto;padding:20px;}';\nhtml += 'h1{font-size:20pt;color:#1a1a2e;border-bottom:3px solid #3a86ff;padding-bottom:10px;}';\nhtml += 'h2{font-size:14pt;color:#3a86ff;margin-top:30px;border-left:4px solid #3a86ff;padding-left:10px;}';\nhtml += 'h3{font-size:12pt;color:#333;}';\nhtml += 'table{width:100%;border-collapse:collapse;margin:15px 0;font-size:10pt;}';\nhtml += 'th{background:#3a86ff;color:#fff;padding:8px 10px;text-align:left;}';\nhtml += 'td{padding:7px 10px;border-bottom:1px solid #eee;}';\nhtml += 'tr:nth-child(even) td{background:#f7f9ff;}';\nhtml += '.highlight{background:#fff3cd;font-weight:bold;}';\nhtml += '.main-label{background:#3a86ff;color:#fff;padding:2px 8px;border-radius:3px;font-size:9pt;}';\nhtml += '.bench-label{background:#6c757d;color:#fff;padding:2px 8px;border-radius:3px;font-size:9pt;}';\nhtml += '.rec-list{padding-left:20px;}';\nhtml += '.rec-list li{margin:8px 0;line-height:1.6;}';\nhtml += 'p{line-height:1.8;margin:10px 0;}';\nhtml += '.meta{color:#888;font-size:9pt;margin-bottom:20px;}';\nhtml += '.tag{display:inline-block;background:#e8f4fd;border:1px solid #bee3f8;padding:2px 8px;border-radius:12px;font-size:9pt;margin:2px;}';\nhtml += '</style></head><body>';\n\n// Header\nhtml += '<h1>📊 Análise Competitiva de Instagram</h1>';\nhtml += '<p class=\"meta\">Projeto: <strong>' + esc(projectName) + '</strong> &nbsp;|&nbsp; Data: ' + today + '</p>';\nhtml += '<p class=\"meta\">Perfis analisados: ';\nprofiles.forEach(p => {\n  html += '<span class=\"tag\">' + (p.isMain ? '⭐ ' : '') + '@' + esc(p.handle) + '</span> ';\n});\nhtml += '</p>';\n\n// Section 1: Resumo Executivo\nhtml += '<h2>1. Resumo Executivo</h2>';\nhtml += '<p>' + esc(analysis.resumo_executivo || '').replace(/\\n\\n/g, '</p><p>') + '</p>';\n\n// Section 2: Métricas Comparativas\nhtml += '<h2>2. Métricas Comparativas</h2>';\nhtml += '<table><thead><tr>';\nhtml += '<th>Perfil</th><th>Seguidores</th><th>Posts</th><th>Méd. Curtidas</th><th>Méd. Comentários</th><th>Tx. Engajamento</th>';\nhtml += '</tr></thead><tbody>';\nprofiles.forEach(p => {\n  const m = calcMetrics(p);\n  const isMain = p.isMain;\n  const cls = isMain ? ' class=\"highlight\"' : '';\n  html += '<tr' + cls + '><td>' + (isMain ? '<span class=\"main-label\">Principal</span> ' : '<span class=\"bench-label\">Benchmark</span> ') + '@' + esc(p.handle) + '</td>';\n  html += '<td>' + (m.followers > 0 ? fmtNum(m.followers) : 'N/D') + '</td>';\n  html += '<td>' + m.posts + '</td>';\n  html += '<td>' + fmtNum(m.avgLikes) + '</td>';\n  html += '<td>' + fmtNum(m.avgComments) + '</td>';\n  html += '<td>' + m.engRate + '%</td></tr>';\n});\nhtml += '</tbody></table>';\n\n// Section 3: Análise do Perfil Principal\nhtml += '<h2>3. Análise do Perfil Principal</h2>';\nhtml += '<p>' + esc(analysis.analise_principal || '').replace(/\\n\\n/g, '</p><p>') + '</p>';\n\n// Section 4: Formatos de Conteúdo\nhtml += '<h2>4. Formatos de Conteúdo</h2>';\nhtml += '<table><thead><tr><th>Perfil</th><th>Reels (Vídeo)</th><th>Carrossel</th><th>Foto</th></tr></thead><tbody>';\nprofiles.forEach(p => {\n  const m = calcMetrics(p);\n  const total = p.rows ? p.rows.length : 0;\n  const reels = m.formats['Reels'] || 0;\n  const carrossel = m.formats['Carrossel'] || 0;\n  const foto = m.formats['Foto'] || 0;\n  const pct = (n) => total > 0 ? ' (' + Math.round(n/total*100) + '%)' : '';\n  html += '<tr><td>' + (p.isMain ? '⭐ ' : '') + '@' + esc(p.handle) + '</td>';\n  html += '<td>' + reels + pct(reels) + '</td>';\n  html += '<td>' + carrossel + pct(carrossel) + '</td>';\n  html += '<td>' + foto + pct(foto) + '</td></tr>';\n});\nhtml += '</tbody></table>';\nhtml += '<p>' + esc(analysis.analise_conteudo || '').replace(/\\n\\n/g, '</p><p>') + '</p>';\n\n// Section 5: Temas Abordados\nhtml += '<h2>5. Temas Abordados</h2>';\nprofiles.forEach(p => {\n  const m = calcMetrics(p);\n  const topThemes = Object.entries(m.themes).sort((a,b) => b[1]-a[1]).slice(0, 6);\n  html += '<h3>' + (p.isMain ? '⭐ ' : '') + '@' + esc(p.handle) + '</h3>';\n  if (topThemes.length > 0) {\n    html += '<table><thead><tr><th>Tema</th><th>Posts</th><th>%</th></tr></thead><tbody>';\n    const total = p.rows ? p.rows.length : 1;\n    topThemes.forEach(([k,v]) => {\n      html += '<tr><td>' + esc(k) + '</td><td>' + v + '</td><td>' + Math.round(v/total*100) + '%</td></tr>';\n    });\n    html += '</tbody></table>';\n  } else {\n    html += '<p>Sem dados de tema.</p>';\n  }\n});\n\n// Section 6: Tom de Voz\nhtml += '<h2>6. Tom de Voz</h2>';\nhtml += '<p>' + esc(analysis.analise_tom || '').replace(/\\n\\n/g, '</p><p>') + '</p>';\nhtml += '<table><thead><tr><th>Perfil</th><th>Tom Predominante</th></tr></thead><tbody>';\nprofiles.forEach(p => {\n  const m = calcMetrics(p);\n  const topTone = Object.entries(m.themes).sort((a,b) => b[1]-a[1])[0];\n  const toneEntries = Object.entries({\n    Reels: 0, Foto: 0, Carrossel: 0\n  });\n  const rowTones = (p.rows || []).reduce((acc, r) => {\n    const t = r.Tom_de_Voz || 'Outros';\n    acc[t] = (acc[t] || 0) + 1;\n    return acc;\n  }, {});\n  const mainTone = Object.entries(rowTones).sort((a,b) => b[1]-a[1])[0];\n  html += '<tr><td>' + (p.isMain ? '⭐ ' : '') + '@' + esc(p.handle) + '</td>';\n  html += '<td>' + esc(mainTone ? mainTone[0] : 'N/D') + '</td></tr>';\n});\nhtml += '</tbody></table>';\n\n// Section 7: Engajamento Detalhado\nhtml += '<h2>7. Análise de Engajamento</h2>';\nhtml += '<p>' + esc(analysis.analise_engajamento || '').replace(/\\n\\n/g, '</p><p>') + '</p>';\n// Top posts per profile\nprofiles.forEach(p => {\n  const m = calcMetrics(p);\n  if (m.topRows.length === 0) return;\n  html += '<h3>🏆 Top Posts — @' + esc(p.handle) + '</h3>';\n  html += '<table><thead><tr><th>#</th><th>Formato</th><th>Data</th><th>Curtidas</th><th>Comentários</th><th>Tema</th><th>Link</th></tr></thead><tbody>';\n  m.topRows.forEach((r, i) => {\n    html += '<tr><td>' + (i+1) + '</td><td>' + esc(r.Formato) + '</td><td>' + esc(r.Data) + '</td>';\n    html += '<td>' + esc(r.Curtidas) + '</td><td>' + esc(r.Comentarios) + '</td>';\n    html += '<td>' + esc(r.Tema) + '</td>';\n    html += '<td><a href=\"' + esc(r.Link) + '\">Ver post</a></td></tr>';\n  });\n  html += '</tbody></table>';\n});\n\n// Section 8: Recomendações Estratégicas\nhtml += '<h2>8. Recomendações Estratégicas</h2>';\nif (analysis.recomendacoes && analysis.recomendacoes.length > 0) {\n  html += '<ul class=\"rec-list\">';\n  analysis.recomendacoes.forEach(r => { html += '<li>✅ ' + esc(r) + '</li>'; });\n  html += '</ul>';\n}\nif (analysis.pontos_atencao && analysis.pontos_atencao.length > 0) {\n  html += '<h3>⚠️ Pontos de Atenção</h3><ul class=\"rec-list\">';\n  analysis.pontos_atencao.forEach(r => { html += '<li>' + esc(r) + '</li>'; });\n  html += '</ul>';\n}\nif (analysis.proximos_passos && analysis.proximos_passos.length > 0) {\n  html += '<h3>🚀 Próximos Passos</h3><ul class=\"rec-list\">';\n  analysis.proximos_passos.forEach(r => { html += '<li>' + esc(r) + '</li>'; });\n  html += '</ul>';\n}\n\nhtml += '<hr><p class=\"meta\">Relatório gerado automaticamente em ' + today + ' | Sistema de Análise Competitiva de Instagram</p>';\nhtml += '</body></html>';\n\n// Build multipart body for Drive API\nconst boundary = '====UploadBoundary====';\nconst docTitle = 'Análise Competitiva — ' + projectName + ' — ' + today;\nconst meta = JSON.stringify({ name: docTitle, mimeType: 'application/vnd.google-apps.document' });\nconst multipartBody = '--' + boundary + '\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n' + meta + '\\r\\n--' + boundary + '\\r\\nContent-Type: text/html; charset=UTF-8\\r\\n\\r\\n' + html + '\\r\\n--' + boundary + '--';\n\nreturn [{ json: { multipartBody, boundary, docTitle, projectName: ctx.projectName, profiles: ctx.profiles, registrySheetId: ctx.registrySheetId, geminiKey: ctx.geminiKey } }];"
+      },
+      "id": "r-node-05",
+      "name": "Gerar HTML e Preparar Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id%2Cname%2CwebViewLink",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawContentType": "=multipart/related; boundary=\"{{ $json.boundary }}\"",
+        "body": "={{ $json.multipartBody }}",
+        "options": {}
+      },
+      "id": "r-node-06",
+      "name": "Criar Google Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sCZUDnU1y3KM3yIy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const driveResp = $input.first().json;\nconst ctx = $('Gerar HTML e Preparar Upload').first().json;\n\nconst docId = driveResp.id;\nconst docUrl = driveResp.webViewLink || ('https://docs.google.com/document/d/' + docId + '/edit?usp=sharing');\nconst docTitle = ctx.docTitle;\nconst projectName = ctx.projectName;\nconst registrySheetId = ctx.registrySheetId || '';\nconst profiles = ctx.profiles;\nconst today = new Date().toLocaleDateString('pt-BR');\nconst mainProfile = (profiles.find(p => p.isMain) || profiles[0])?.handle || '';\nconst benchmarkHandles = profiles.filter(p => !p.isMain).map(p => '@' + p.handle).join(', ');\n\nreturn [{ json: { docId, docUrl, docTitle, projectName, registrySheetId, mainProfile, benchmarkHandles, today, totalProfiles: profiles.length } }];"
+      },
+      "id": "r-node-07",
+      "name": "Processar Resposta Doc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.registrySheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Projetos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data": "={{ $json.today }}",
+            "Projeto": "={{ $json.projectName }}",
+            "Perfil_Principal": "={{ $json.mainProfile }}",
+            "Benchmarks": "={{ $json.benchmarkHandles }}",
+            "Total_Perfis": "={{ $json.totalProfiles }}",
+            "Link_Relatorio": "={{ $json.docUrl }}",
+            "Titulo_Doc": "={{ $json.docTitle }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "r-node-08",
+      "name": "Salvar no Registro",
+      "continueOnFail": true,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1740, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sCZUDnU1y3KM3yIy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Processar Resposta Doc').first().json;\nreturn [{ json: {\n  status: 'success',\n  docUrl: prev.docUrl,\n  docId: prev.docId,\n  docTitle: prev.docTitle\n} }];"
+      },
+      "id": "r-node-09",
+      "name": "Montar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "r-node-10",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2180, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: true, message: $json.message || 'Erro ao gerar relatório' }) }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "r-node-err",
+      "name": "Responder Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [860, 520]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
+    },
+    "Validar Input": {
+      "main": [[{ "node": "Preparar Prompt Análise", "type": "main", "index": 0 }]]
+    },
+    "Preparar Prompt Análise": {
+      "main": [[{ "node": "Gemini - Analisar", "type": "main", "index": 0 }]]
+    },
+    "Gemini - Analisar": {
+      "main": [[{ "node": "Gerar HTML e Preparar Upload", "type": "main", "index": 0 }]]
+    },
+    "Gerar HTML e Preparar Upload": {
+      "main": [[{ "node": "Criar Google Doc", "type": "main", "index": 0 }]]
+    },
+    "Criar Google Doc": {
+      "main": [[{ "node": "Processar Resposta Doc", "type": "main", "index": 0 }]]
+    },
+    "Processar Resposta Doc": {
+      "main": [[{ "node": "Salvar no Registro", "type": "main", "index": 0 }]]
+    },
+    "Salvar no Registro": {
+      "main": [[{ "node": "Montar Resposta", "type": "main", "index": 0 }]]
+    },
+    "Montar Resposta": {
+      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  }
+}

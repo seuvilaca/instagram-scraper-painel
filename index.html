@@ -3,468 +3,684 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Instagram Scraper · Painel</title>
+<title>Análise Competitiva — Instagram</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f4f5;color:#18181b;min-height:100vh}
-  header{background:#18181b;color:#fff;padding:16px 28px;display:flex;align-items:center;gap:10px}
-  header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
-  header span{font-size:20px}
-  .nav{background:#fff;border-bottom:1px solid #e4e4e7;display:flex;gap:0;padding:0 28px}
-  .nav-item{padding:14px 18px;font-size:14px;cursor:pointer;color:#71717a;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
-  .nav-item.active{color:#18181b;border-bottom-color:#18181b;font-weight:500}
-  .nav-item:hover:not(.active){color:#3f3f46}
-  .page{display:none;padding:28px;max-width:760px;margin:0 auto}
-  .page.active{display:block}
-  .card{background:#fff;border:1px solid #e4e4e7;border-radius:10px;padding:22px;margin-bottom:18px}
-  .card-title{font-size:14px;font-weight:600;color:#3f3f46;margin-bottom:18px;display:flex;align-items:center;gap:8px}
-  label{display:block;font-size:13px;font-weight:500;color:#52525b;margin-bottom:6px}
-  input[type=text],input[type=password],input[type=number]{width:100%;padding:9px 12px;border:1px solid #d4d4d8;border-radius:6px;font-size:14px;outline:none;transition:border .15s;background:#fafafa}
-  input:focus{border-color:#18181b;background:#fff}
-  .row{display:flex;gap:8px;align-items:flex-end}
-  .row input{flex:1}
-  .fg{margin-bottom:16px}
-  .btn{padding:9px 16px;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
-  .btn-dark{background:#18181b;color:#fff}
-  .btn-dark:hover{background:#27272a}
-  .btn-dark:disabled{background:#a1a1aa;cursor:not-allowed}
-  .btn-red{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-  .btn-red:hover{background:#fee2e2}
-  .btn-sm{padding:5px 10px;font-size:12px}
-  .btn-outline{background:#fff;border:1px solid #d4d4d8;color:#3f3f46}
-  .btn-outline:hover{background:#f4f4f5}
+  :root {
+    --bg: #0f0f1a;
+    --card: #1a1a2e;
+    --card2: #16213e;
+    --border: #2a2a4a;
+    --accent: #3a86ff;
+    --accent2: #8338ec;
+    --green: #06d6a0;
+    --red: #ef476f;
+    --yellow: #ffd166;
+    --text: #e0e0f0;
+    --muted: #888aaa;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
 
-  /* Keys list */
-  .key-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-  .key-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fafafa;border:1px solid #e4e4e7;border-radius:8px}
-  .key-item.is-active{background:#f0fdf4;border-color:#bbf7d0}
-  .key-item.is-exhausted{background:#fef2f2;border-color:#fecaca}
-  .key-mono{font-family:monospace;font-size:12px;color:#52525b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
-  .badge-green{background:#dcfce7;color:#15803d}
-  .badge-red{background:#fee2e2;color:#dc2626}
-  .badge-gray{background:#f4f4f5;color:#71717a}
-  .key-order{font-size:12px;color:#a1a1aa;font-weight:600;min-width:20px}
+  .app { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
 
-  /* Progress */
-  .progress-box{margin-top:20px;display:none}
-  .steps{display:flex;flex-direction:column;gap:8px}
-  .step{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:8px;border:1px solid #e4e4e7;font-size:14px;background:#fafafa;transition:all .2s}
-  .step.s-active{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
-  .step.s-done{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}
-  .step.s-error{background:#fef2f2;border-color:#fecaca;color:#dc2626}
-  .step.s-pending{color:#a1a1aa}
-  .step-icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
-  .step-text{flex:1}
-  .step-sub{font-size:12px;margin-top:2px;opacity:.75}
-  .spinner{width:15px;height:15px;border:2px solid #bfdbfe;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .timer-tag{font-size:11px;background:#dbeafe;color:#1d4ed8;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:6px}
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .header h1 { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-  .result-box{margin-top:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px;display:none}
-  .result-box a{color:#15803d;font-weight:600;text-decoration:none;font-size:15px}
-  .result-box a:hover{text-decoration:underline}
-  .result-meta{font-size:13px;color:#52525b;margin-top:6px}
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--card); padding: 4px; border-radius: var(--radius); }
+  .tab-btn { flex: 1; padding: 8px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 7px; font-size: 13px; font-weight: 500; transition: all .2s; }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-btn:hover:not(.active) { background: var(--border); color: var(--text); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
-  /* History */
-  .hist-item{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #f4f4f5;font-size:14px}
-  .hist-item:last-child{border:none}
-  .hist-profile{font-weight:600;min-width:180px}
-  .hist-count{color:#71717a;font-size:13px;min-width:70px}
-  .hist-date{color:#a1a1aa;font-size:12px;flex:1}
-  .hist-link{color:#2563eb;font-size:13px;text-decoration:none;white-space:nowrap}
-  .hist-link:hover{text-decoration:underline}
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
 
-  .empty{color:#a1a1aa;font-size:14px;text-align:center;padding:24px 0}
-  .alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px}
-  .alert-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
-  .alert-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
-  .alert-ok{background:#f0fdf4;border:1px solid #86efac;color:#15803d}
-  .section-label{font-size:11px;font-weight:600;color:#a1a1aa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
-  hr{border:none;border-top:1px solid #f4f4f5;margin:18px 0}
-  .help-text{font-size:12px;color:#71717a;margin-top:5px}
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+  input[type=text], input[type=number], input[type=password] {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; transition: border .2s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  .form-group { margin-bottom: 16px; }
+
+  .section-label {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+    color: var(--text); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .badge-main { background: var(--accent); color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 20px; }
+  .badge-bench { background: var(--card2); color: var(--muted); font-size: 10px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); }
+
+  .benchmark-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .benchmark-row input { flex: 1; }
+  .btn-remove { background: none; border: 1px solid var(--border); color: var(--muted); width: 36px; height: 36px;
+    border-radius: 8px; cursor: pointer; font-size: 16px; transition: all .2s; flex-shrink: 0; }
+  .btn-remove:hover { border-color: var(--red); color: var(--red); }
+
+  .posts-row { display: flex; align-items: center; gap: 12px; }
+  .posts-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .posts-value { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-weight: 700; color: var(--accent); min-width: 52px; text-align: center; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; width: 100%; }
+  .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-add { background: none; border: 1px dashed var(--border); color: var(--muted); padding: 9px; width: 100%;
+    border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .2s; }
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 7px 14px; font-size: 12px; }
+  .btn-danger { background: var(--red); color: #fff; }
+
+  .progress-wrap { display: none; }
+  .progress-wrap.visible { display: block; }
+  .progress-bar-bg { background: var(--border); border-radius: 20px; height: 6px; overflow: hidden; }
+  .progress-bar { background: linear-gradient(90deg, var(--accent), var(--accent2)); height: 6px; border-radius: 20px; transition: width .5s; }
+  .progress-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+
+  .profile-card {
+    background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px; transition: border-color .3s;
+  }
+  .profile-card.running { border-color: var(--accent); }
+  .profile-card.done { border-color: var(--green); }
+  .profile-card.error { border-color: var(--red); }
+  .pc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .pc-handle { font-weight: 700; font-size: 14px; }
+  .pc-status { font-size: 18px; }
+  .pc-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+  .step-chip {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px; background: var(--bg);
+    border: 1px solid var(--border); color: var(--muted); transition: all .3s;
+  }
+  .step-chip.active { background: rgba(58,134,255,.15); border-color: var(--accent); color: var(--accent); }
+  .step-chip.done { background: rgba(6,214,160,.12); border-color: var(--green); color: var(--green); }
+  .step-chip.error { background: rgba(239,71,111,.12); border-color: var(--red); color: var(--red); }
+  .sheet-link { font-size: 11px; color: var(--accent); text-decoration: none; margin-top: 6px; display: inline-block; }
+  .sheet-link:hover { text-decoration: underline; }
+
+  .report-step { background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; text-align: center; }
+  .report-step .spinner { font-size: 24px; animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result-card { background: linear-gradient(135deg, rgba(6,214,160,.1), rgba(58,134,255,.1)); border: 1px solid var(--green); border-radius: var(--radius); padding: 24px; text-align: center; }
+  .result-card h3 { font-size: 16px; color: var(--green); margin-bottom: 12px; }
+  .result-link { display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #111; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; margin-top: 8px; }
+  .result-link:hover { opacity: .9; }
+
+  .setting-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .setting-row input { flex: 1; }
+  .key-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .key-badge.active { background: rgba(6,214,160,.2); color: var(--green); border: 1px solid var(--green); }
+  .key-badge.unused { background: rgba(58,134,255,.1); color: var(--muted); border: 1px solid var(--border); }
+  .key-badge.exhausted { background: rgba(239,71,111,.15); color: var(--red); border: 1px solid var(--red); }
+
+  .history-item { background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+  .hi-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .hi-title { font-weight: 700; font-size: 14px; }
+  .hi-date { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .hi-handles { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .hi-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--accent); text-decoration: none; }
+  .hi-link:hover { text-decoration: underline; }
+  .empty-state { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; max-width: 300px; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .hidden { display: none !important; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .text-muted { color: var(--muted); font-size: 12px; }
+  .text-success { color: var(--green); }
+  .text-danger { color: var(--red); }
 </style>
 </head>
 <body>
+<div class="app">
 
-<header>
-  <span>📊</span>
-  <h1>Instagram Scraper · Painel</h1>
-</header>
-
-<nav class="nav">
-  <div class="nav-item active" data-tab="gerar">Gerar Relatório</div>
-  <div class="nav-item" data-tab="config">Configurações</div>
-  <div class="nav-item" data-tab="historico">Histórico</div>
-</nav>
-
-<!-- ── TAB: GERAR ──────────────────────────────────── -->
-<div class="page active" id="page-gerar">
-  <div class="card">
-    <div class="card-title">🔍 Novo Relatório</div>
-    <div class="fg">
-      <label>Perfil do Instagram</label>
-      <input type="text" id="inp-profile" placeholder="@escola ou https://www.instagram.com/escola">
+  <div class="header">
+    <div>
+      <h1>📊 Análise Competitiva</h1>
+      <div class="subtitle">Instagram · Análise por IA</div>
     </div>
-    <div class="fg" style="max-width:140px">
-      <label>Quantidade de posts</label>
-      <input type="number" id="inp-posts" value="100" min="1" max="500">
-    </div>
-    <button class="btn btn-dark" id="btn-run" onclick="startScraping()">▶ Gerar Relatório</button>
   </div>
 
-  <div class="progress-box" id="progress-box">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('analise',this)">🚀 Gerar Análise</button>
+    <button class="tab-btn" onclick="showTab('historico',this)">📋 Histórico</button>
+    <button class="tab-btn" onclick="showTab('config',this)">⚙️ Configurações</button>
+  </div>
+
+  <!-- ======== TAB: GERAR ANÁLISE ======== -->
+  <div id="tab-analise" class="tab-panel active">
+    <div id="form-section">
+      <div class="card">
+        <div class="form-group">
+          <label>Nome do Projeto</label>
+          <input type="text" id="project-name" placeholder="Ex: Concorrentes Q2-2025, Análise Parvus..." />
+        </div>
+
+        <hr class="divider">
+
+        <div class="section-label">
+          <span>Perfil Principal</span>
+          <span class="badge-main">⭐ Principal</span>
+        </div>
+        <div class="form-group">
+          <input type="text" id="main-profile" placeholder="@handle do perfil principal" />
+        </div>
+
+        <hr class="divider">
+
+        <div class="section-label">
+          <span>Perfis Benchmark</span>
+          <span class="badge-bench">Concorrentes / Referências</span>
+        </div>
+        <div id="benchmark-list"></div>
+        <button class="btn-add" onclick="addBenchmark()" id="btn-add-bench">＋ Adicionar Perfil Benchmark</button>
+
+        <hr class="divider">
+
+        <div class="form-group">
+          <label>Posts por perfil</label>
+          <div class="posts-row">
+            <input type="range" id="posts-range" min="6" max="100" value="30" oninput="document.getElementById('posts-display').textContent=this.value">
+            <div class="posts-value" id="posts-display">30</div>
+          </div>
+          <div class="text-muted mt8">Máximo 100 posts. Mais posts = análise mais rica e tempo maior de processamento.</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-start" onclick="startAnalysis()">
+        ▶ Gerar Análise Competitiva
+      </button>
+    </div>
+
+    <div id="progress-section" class="progress-wrap">
+      <div class="card">
+        <div style="margin-bottom:16px;">
+          <div class="flex-between" style="margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:600;" id="progress-title">Iniciando...</span>
+            <span class="text-muted" id="progress-count">0 / 0</span>
+          </div>
+          <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+        </div>
+        <div id="profiles-progress"></div>
+        <div id="report-step-wrap" class="hidden">
+          <div class="report-step">
+            <div class="spinner">⚙️</div>
+            <div style="margin-top:10px;font-weight:600;">Gerando relatório no Google Docs...</div>
+            <div class="text-muted mt8">Análise comparativa por IA · Aguarde</div>
+          </div>
+        </div>
+        <div id="result-wrap" class="hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== TAB: HISTÓRICO ======== -->
+  <div id="tab-historico" class="tab-panel">
     <div class="card">
-      <div class="card-title" id="progress-title">Processando...</div>
-      <div class="steps">
-        <div class="step s-pending" id="step-apify">
-          <div class="step-icon">⏳</div>
-          <div class="step-text">
-            <div>Coletando posts via Apify <span class="timer-tag" id="timer-apify" style="display:none"></span></div>
-            <div class="step-sub" id="step-apify-sub">Pode levar até 5 minutos para 100 posts</div>
-          </div>
-        </div>
-        <div class="step s-pending" id="step-gemini">
-          <div class="step-icon">⏳</div>
-          <div class="step-text">
-            <div>Classificando com Gemini 2.5 Pro</div>
-            <div class="step-sub" id="step-gemini-sub">Análise de tema e tom de voz</div>
-          </div>
-        </div>
-        <div class="step s-pending" id="step-sheets">
-          <div class="step-icon">⏳</div>
-          <div class="step-text">
-            <div>Salvando no Google Sheets</div>
-            <div class="step-sub" id="step-sheets-sub"></div>
-          </div>
-        </div>
+      <div class="flex-between" style="margin-bottom:16px;">
+        <span style="font-weight:700;">Análises Realizadas</span>
+        <button class="btn btn-sm btn-danger" onclick="clearHistory()">Limpar tudo</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- ======== TAB: CONFIGURAÇÕES ======== -->
+  <div id="tab-config" class="tab-panel">
+
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px;">🔑 Chaves Apify</div>
+      <div class="text-muted" style="margin-bottom:14px;">A chave <strong>Ativa</strong> é usada primeiro. Quando os créditos acabam, a próxima <strong>Disponível</strong> é promovida automaticamente.</div>
+      <div id="apify-keys-list"></div>
+      <div class="setting-row mt8">
+        <input type="text" id="new-apify-key" placeholder="Nova chave Apify (apify_api_...)" />
+        <button class="btn btn-sm" style="background:var(--accent);color:#fff;white-space:nowrap;" onclick="addApifyKey()">Adicionar</button>
       </div>
     </div>
-  </div>
 
-  <div class="result-box" id="result-box">
-    ✅ Relatório gerado com sucesso!<br><br>
-    <a id="result-link" href="#" target="_blank">Abrir no Google Sheets →</a>
-    <div class="result-meta" id="result-meta"></div>
-  </div>
-</div>
-
-<!-- ── TAB: CONFIG ─────────────────────────────────── -->
-<div class="page" id="page-config">
-
-  <div class="card">
-    <div class="card-title">🔑 Chaves Apify</div>
-    <p style="font-size:13px;color:#71717a;margin-bottom:16px">
-      A primeira chave ativa será usada. Quando esgotar, o sistema ativa automaticamente a próxima.
-    </p>
-    <div class="key-list" id="apify-key-list"></div>
-    <div class="row">
-      <input type="text" id="inp-new-apify" placeholder="apify_api_...">
-      <button class="btn btn-dark" onclick="addApifyKey()">Adicionar</button>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px;">🤖 Chave Gemini</div>
+      <input type="password" id="gemini-key" placeholder="AIza..." />
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">🤖 Chave Gemini</div>
-    <div class="fg">
-      <label>Google Gemini API Key</label>
-      <div class="row">
-        <input type="password" id="inp-gemini" placeholder="AIza...">
-        <button class="btn btn-dark" onclick="saveField('geminiKey','inp-gemini','Chave Gemini salva!')">Salvar</button>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px;">🔗 Webhooks n8n</div>
+      <div class="form-group">
+        <label>Webhook 1 — Scraper por perfil</label>
+        <input type="text" id="webhook1-url" placeholder="https://...n8n.../webhook/instagram-scraper-v2" />
+      </div>
+      <div class="form-group">
+        <label>Webhook 2 — Gerador de relatório</label>
+        <input type="text" id="webhook2-url" placeholder="https://...n8n.../webhook/instagram-report-v2" />
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">📄 Google Sheet de Destino</div>
-    <div class="fg">
-      <label>ID da planilha onde os dados serão salvos</label>
-      <div class="row">
-        <input type="text" id="inp-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
-        <button class="btn btn-dark" onclick="saveField('sheetId','inp-sheet-id','Sheet ID salvo!')">Salvar</button>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:14px;">📊 Planilha Mestre (Registro de Projetos)</div>
+      <div class="text-muted" style="margin-bottom:12px;">
+        ID da planilha Google Sheets que registra todos os projetos analisados.<br><br>
+        Crie uma planilha com uma aba chamada <strong>Projetos</strong> contendo estas colunas na linha 1:<br>
+        <code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:11px;display:inline-block;margin-top:6px;">Data | Projeto | Perfil_Principal | Benchmarks | Total_Perfis | Link_Relatorio | Titulo_Doc</code>
       </div>
-      <p class="help-text">Copie da URL da planilha: docs.google.com/spreadsheets/d/<strong>[ID aqui]</strong>/edit</p>
+      <input type="text" id="registry-sheet-id" placeholder="ID da planilha (extraído da URL do Google Sheets)" />
+      <div class="text-muted mt8">Deixe vazio para pular o registro. O relatório será gerado normalmente.</div>
     </div>
-    <div class="alert alert-info" style="margin-bottom:0">
-      Crie uma planilha no Google Sheets, cole o ID acima e certifique-se de que a conta n8n tem acesso a ela.
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">🔗 n8n Webhook URL</div>
-    <div class="fg">
-      <label>URL do webhook que receberá as requisições</label>
-      <div class="row">
-        <input type="text" id="inp-webhook" placeholder="https://seu-n8n.com/webhook/instagram-scraper">
-        <button class="btn btn-dark" onclick="saveField('webhookUrl','inp-webhook','URL salva!')">Salvar</button>
-      </div>
-    </div>
-    <div class="alert alert-info" style="margin-top:12px;margin-bottom:0">
-      Cole aqui a URL do webhook do workflow n8n depois de importá-lo e ativá-lo.
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">🔍 Status das Configurações</div>
-    <div id="status-check"></div>
+    <button class="btn btn-primary" onclick="saveAllSettings()">💾 Salvar Configurações</button>
   </div>
 
 </div>
 
-<!-- ── TAB: HISTÓRICO ──────────────────────────────── -->
-<div class="page" id="page-historico">
-  <div class="card">
-    <div class="card-title">📋 Relatórios Gerados</div>
-    <div id="history-list"><div class="empty">Nenhum relatório gerado ainda.</div></div>
-  </div>
-  <div style="text-align:right">
-    <button class="btn btn-outline btn-sm" onclick="clearHistory()">Limpar histórico</button>
-  </div>
-</div>
+<div class="toast" id="toast"></div>
 
 <script>
-// ── Storage ────────────────────────────────────────────────
+const STORAGE_KEY = 'ig_scraper_v2';
+
 function cfg() {
-  const defaults = { apifyKeys: [], geminiKey: '', webhookUrl: '', sheetId: '', history: [] }
-  return Object.assign(defaults, JSON.parse(localStorage.getItem('ig_scraper') || '{}'))
+  const d = { apifyKeys: [], geminiKey: '', webhook1Url: '', webhook2Url: '', registrySheetId: '', history: [] };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')); } catch(e) { return d; }
 }
-function saveCfg(c) { localStorage.setItem('ig_scraper', JSON.stringify(c)) }
+function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
 
-// ── Tabs ───────────────────────────────────────────────────
-document.querySelectorAll('.nav-item').forEach(el => {
-  el.addEventListener('click', () => {
-    const tab = el.dataset.tab
-    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'))
-    document.querySelectorAll('.page').forEach(x => x.classList.remove('active'))
-    el.classList.add('active')
-    document.getElementById('page-' + tab).classList.add('active')
-    if (tab === 'config') renderConfig()
-    if (tab === 'historico') renderHistory()
-  })
-})
-
-// ── Config ─────────────────────────────────────────────────
-function renderConfig() {
-  const c = cfg()
-  const list = document.getElementById('apify-key-list')
-  if (!c.apifyKeys.length) {
-    list.innerHTML = '<div class="empty" style="padding:10px 0">Nenhuma chave adicionada.</div>'
-  } else {
-    list.innerHTML = c.apifyKeys.map((k, i) => `
-      <div class="key-item ${k.status === 'active' ? 'is-active' : k.status === 'exhausted' ? 'is-exhausted' : ''}">
-        <span class="key-order">#${i+1}</span>
-        <span class="key-mono">${k.key.slice(0,24)}...${k.key.slice(-4)}</span>
-        <span class="badge ${k.status==='active'?'badge-green':k.status==='exhausted'?'badge-red':'badge-gray'}">${k.status==='active'?'ativa':k.status==='exhausted'?'esgotada':'aguardando'}</span>
-        ${k.status==='exhausted'?`<button class="btn btn-outline btn-sm" onclick="resetKey(${i})">Resetar</button>`:''}
-        <button class="btn btn-red btn-sm" onclick="removeKey(${i})">Remover</button>
-      </div>
-    `).join('')
-  }
-  document.getElementById('inp-gemini').value = c.geminiKey || ''
-  document.getElementById('inp-webhook').value = c.webhookUrl || ''
-  document.getElementById('inp-sheet-id').value = c.sheetId || ''
-  renderStatus(c)
+// ---- TABS ----
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'historico') renderHistory();
+  if (name === 'config') renderSettings();
 }
 
-function renderStatus(c) {
-  const checks = [
-    { label: 'Chave Apify', ok: c.apifyKeys.some(k => k.status === 'active'), hint: 'Adicione uma chave Apify acima' },
-    { label: 'Chave Gemini', ok: !!c.geminiKey, hint: 'Configure a chave Gemini' },
-    { label: 'Sheet ID', ok: !!c.sheetId, hint: 'Configure o ID da planilha de destino' },
-    { label: 'Webhook n8n', ok: !!c.webhookUrl, hint: 'Cole a URL do webhook n8n' },
-  ]
-  document.getElementById('status-check').innerHTML = checks.map(ch => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f4f4f5;font-size:13px">
-      <span>${ch.ok ? '✅' : '⚠️'}</span>
-      <span style="font-weight:500;min-width:130px">${ch.label}</span>
-      <span style="color:${ch.ok ? '#15803d' : '#92400e'}">${ch.ok ? 'Configurado' : ch.hint}</span>
-    </div>
-  `).join('')
+// ---- TOAST ----
+let toastTimer;
+function toast(msg, type) {
+  clearTimeout(toastTimer);
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (type || 'success');
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-function addApifyKey() {
-  const key = document.getElementById('inp-new-apify').value.trim()
-  if (!key || !key.startsWith('apify_api_')) { alert('Chave inválida. Deve começar com apify_api_'); return }
-  const c = cfg()
-  const status = c.apifyKeys.filter(k => k.status !== 'exhausted').length === 0 ? 'active' : 'unused'
-  c.apifyKeys.push({ key, status })
-  saveCfg(c); document.getElementById('inp-new-apify').value = ''; renderConfig()
+// ---- BENCHMARKS ----
+let benchCnt = 0;
+function addBenchmark() {
+  const list = document.getElementById('benchmark-list');
+  if (list.children.length >= 10) { toast('Máximo 10 benchmarks', 'error'); return; }
+  const id = 'bench-' + (++benchCnt);
+  const row = document.createElement('div');
+  row.className = 'benchmark-row';
+  row.id = id;
+  row.innerHTML = '<input type="text" placeholder="@handle" class="bench-input" /><button class="btn-remove" onclick="removeBenchmark(\'' + id + '\')">✕</button>';
+  list.appendChild(row);
+  if (list.children.length >= 10) document.getElementById('btn-add-bench').style.display = 'none';
+}
+function removeBenchmark(id) {
+  document.getElementById(id)?.remove();
+  document.getElementById('btn-add-bench').style.display = '';
+}
+function getBenchHandles() {
+  return Array.from(document.querySelectorAll('.bench-input')).map(i => i.value.replace(/^@/,'').trim()).filter(h => h);
 }
 
-function removeKey(i) {
-  const c = cfg(); c.apifyKeys.splice(i, 1)
-  promoteNextKey(c); saveCfg(c); renderConfig()
+// ---- APIFY KEY ROTATION ----
+function getActiveApifyKey() {
+  const c = cfg();
+  const a = c.apifyKeys.find(k => k.status === 'active');
+  if (a) return a.key;
+  const u = c.apifyKeys.find(k => k.status === 'unused');
+  if (u) { u.status = 'active'; saveCfg(c); return u.key; }
+  return null;
+}
+function markKeyExhausted(usedKey) {
+  const c = cfg();
+  const k = c.apifyKeys.find(k => k.key === usedKey);
+  if (k) k.status = 'exhausted';
+  const next = c.apifyKeys.find(k => k.status === 'unused');
+  if (next) { next.status = 'active'; saveCfg(c); return next.key; }
+  saveCfg(c);
+  return null;
 }
 
-function resetKey(i) {
-  const c = cfg(); c.apifyKeys[i].status = 'unused'
-  promoteNextKey(c); saveCfg(c); renderConfig()
+// ---- PROGRESS UI ----
+function setStep(handle, step, state) {
+  const el = document.getElementById('chip-' + handle + '-' + step);
+  if (el) el.className = 'step-chip ' + state;
+}
+function setCardState(handle, state) {
+  const el = document.getElementById('card-' + handle);
+  if (el) el.className = 'profile-card ' + state;
+}
+function setCardStatus(handle, icon) {
+  const el = document.getElementById('status-' + handle);
+  if (el) el.textContent = icon;
+}
+function setCardLink(handle, url) {
+  const el = document.getElementById('link-' + handle);
+  if (el && url) el.innerHTML = '<a class="sheet-link" href="' + url + '" target="_blank">📊 Ver planilha</a>';
+}
+function updateOverall(done, total, label) {
+  document.getElementById('progress-title').textContent = label;
+  document.getElementById('progress-count').textContent = done + ' / ' + total;
+  document.getElementById('progress-bar').style.width = (total > 0 ? Math.round(done / total * 100) : 0) + '%';
 }
 
-function promoteNextKey(c) {
-  if (!c.apifyKeys.find(k => k.status === 'active')) {
-    const next = c.apifyKeys.find(k => k.status === 'unused')
-    if (next) next.status = 'active'
-  }
-}
+// ---- MAIN: START ANALYSIS ----
+async function startAnalysis() {
+  const c = cfg();
+  const projectName = document.getElementById('project-name').value.trim();
+  const mainHandle = document.getElementById('main-profile').value.replace(/^@/,'').trim();
+  const benchHandles = getBenchHandles();
+  const posts = parseInt(document.getElementById('posts-range').value) || 30;
 
-function saveField(field, inputId, msg) {
-  const c = cfg(); c[field] = document.getElementById(inputId).value.trim()
-  saveCfg(c)
-  renderStatus(c)
-  const btn = event.currentTarget
-  const orig = btn.textContent
-  btn.textContent = '✓ Salvo'; btn.style.background = '#15803d'
-  setTimeout(() => { btn.textContent = orig; btn.style.background = '' }, 1500)
-}
+  if (!projectName) { toast('Informe o nome do projeto', 'error'); return; }
+  if (!mainHandle) { toast('Informe o perfil principal', 'error'); return; }
+  if (!c.webhook1Url) { toast('Configure o Webhook 1 nas Configurações', 'error'); return; }
+  if (!c.webhook2Url) { toast('Configure o Webhook 2 nas Configurações', 'error'); return; }
+  if (!c.geminiKey) { toast('Configure a chave Gemini nas Configurações', 'error'); return; }
+  if (!getActiveApifyKey()) { toast('Nenhuma chave Apify disponível. Adicione nas Configurações.', 'error'); return; }
 
-// ── History ────────────────────────────────────────────────
-function renderHistory() {
-  const c = cfg()
-  const el = document.getElementById('history-list')
-  if (!c.history.length) { el.innerHTML = '<div class="empty">Nenhum relatório gerado ainda.</div>'; return }
-  el.innerHTML = [...c.history].reverse().map(h => `
-    <div class="hist-item">
-      <span class="hist-profile">@${h.profile}</span>
-      <span class="hist-count">${h.posts} posts</span>
-      <span class="hist-date">${h.date}</span>
-      <a class="hist-link" href="${h.url}" target="_blank">Abrir planilha →</a>
-    </div>
-  `).join('')
-}
+  const allProfiles = [{ handle: mainHandle, isMain: true }, ...benchHandles.map(h => ({ handle: h, isMain: false }))];
+  const total = allProfiles.length;
 
-function clearHistory() {
-  if (!confirm('Limpar todo o histórico?')) return
-  const c = cfg(); c.history = []; saveCfg(c); renderHistory()
-}
+  // Switch to progress view
+  document.getElementById('form-section').classList.add('hidden');
+  document.getElementById('progress-section').classList.add('visible');
+  document.getElementById('btn-start').disabled = true;
 
-// ── Scraping ───────────────────────────────────────────────
-let _timerInterval = null
+  // Build profile cards
+  const pList = document.getElementById('profiles-progress');
+  pList.innerHTML = '';
+  allProfiles.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'profile-card';
+    d.id = 'card-' + p.handle;
+    d.innerHTML =
+      '<div class="pc-header">' +
+        '<div class="pc-handle">' +
+          (p.isMain ? '<span class="badge-main" style="margin-right:6px;">Principal</span>' : '<span class="badge-bench" style="margin-right:6px;">Benchmark</span>') +
+          '@' + esc(p.handle) +
+        '</div>' +
+        '<div class="pc-status" id="status-' + p.handle + '">⏳</div>' +
+      '</div>' +
+      '<div class="pc-steps">' +
+        '<div class="step-chip" id="chip-' + p.handle + '-0">📥 Coletando posts</div>' +
+        '<div class="step-chip" id="chip-' + p.handle + '-1">🤖 Classificando</div>' +
+        '<div class="step-chip" id="chip-' + p.handle + '-2">💾 Criando planilha</div>' +
+      '</div>' +
+      '<div id="link-' + p.handle + '"></div>';
+    pList.appendChild(d);
+  });
 
-async function startScraping() {
-  const c = cfg()
-  if (!c.webhookUrl) { alert('Configure a URL do webhook n8n na aba Configurações.'); return }
-  if (!c.apifyKeys.length) { alert('Adicione pelo menos uma chave Apify na aba Configurações.'); return }
-  if (!c.geminiKey) { alert('Configure a chave Gemini na aba Configurações.'); return }
-  if (!c.sheetId) { alert('Configure o ID do Google Sheet de destino na aba Configurações.'); return }
+  const profileResults = [];
+  let done = 0;
 
-  const raw = document.getElementById('inp-profile').value.trim()
-  const posts = parseInt(document.getElementById('inp-posts').value) || 100
-  const profile = raw.replace(/^@/,'').replace(/.*instagram\.com\//,'').replace(/\?.*/,'').replace(/\/$/,'').trim()
-  if (!profile) { alert('Digite o perfil do Instagram.'); return }
+  for (const p of allProfiles) {
+    updateOverall(done, total + 1, 'Processando @' + p.handle + '...');
+    setCardState(p.handle, 'running');
+    setStep(p.handle, 0, 'active');
 
-  const activeKey = c.apifyKeys.find(k => k.status === 'active')
-  if (!activeKey) { alert('Nenhuma chave Apify ativa. Verifique as configurações.'); return }
+    let apifyKey = getActiveApifyKey();
+    let result = null;
+    let attempts = 0;
 
-  // UI setup
-  const btn = document.getElementById('btn-run')
-  btn.disabled = true; btn.innerHTML = '<div class="spinner" style="border-color:#fff3;border-top-color:#fff"></div> Processando...'
-  document.getElementById('progress-box').style.display = 'block'
-  document.getElementById('result-box').style.display = 'none'
-  document.getElementById('progress-title').textContent = `Processando @${profile}...`
-  setStep('apify', 'active', 'Coletando posts — aguarde...')
-  setStep('gemini', 'pending', 'Análise de tema e tom de voz')
-  setStep('sheets', 'pending', '')
+    while (attempts < 3) {
+      attempts++;
+      try {
+        const resp = await fetch(c.webhook1Url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName, profile: p.handle, posts, apifyKey, geminiKey: c.geminiKey }),
+          signal: AbortSignal.timeout(370000)
+        });
 
-  // Timer visual
-  const startTime = Date.now()
-  let phase = 0
-  if (_timerInterval) clearInterval(_timerInterval)
-  _timerInterval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000)
-    const mins = Math.floor(elapsed / 60), secs = elapsed % 60
-    const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
-    // Avança fases visuais baseado no tempo
-    if (elapsed < 180) {
-      // fase 0: Apify
-      if (phase !== 0) { phase = 0; setStep('apify','active','') }
-      document.getElementById('timer-apify').style.display = 'inline'
-      document.getElementById('timer-apify').textContent = label
-    } else if (elapsed < 240) {
-      // fase 1: Gemini (3-4 min)
-      if (phase !== 1) { phase = 1; setStep('apify','done',`${posts} posts coletados`); setStep('gemini','active','Classificando tema e tom de voz...') }
-    } else {
-      // fase 2: Sheets (4+ min)
-      if (phase !== 2) { phase = 2; setStep('gemini','done','Classificação concluída'); setStep('sheets','active','Salvando dados...') }
+        if (resp.status === 402 || resp.status === 429) {
+          const next = markKeyExhausted(apifyKey);
+          if (next) { apifyKey = next; continue; }
+          throw new Error('Créditos Apify esgotados. Adicione mais chaves nas Configurações.');
+        }
+
+        const data = await resp.json();
+        if (data.error || (data.message && data.message.includes('APIFY_CREDIT_EXHAUSTED'))) {
+          const next = markKeyExhausted(apifyKey);
+          if (next && data.message && data.message.includes('APIFY_CREDIT_EXHAUSTED')) { apifyKey = next; continue; }
+          if (data.error) throw new Error(data.message || 'Erro no workflow de scraping');
+        }
+
+        setStep(p.handle, 0, 'done');
+        setStep(p.handle, 1, 'done');
+        setStep(p.handle, 2, 'done');
+        setCardState(p.handle, 'done');
+        setCardStatus(p.handle, '✅');
+        setCardLink(p.handle, data.sheetUrl);
+        result = {
+          handle: p.handle,
+          isMain: p.isMain,
+          sheetId: data.sheetId || '',
+          sheetUrl: data.sheetUrl || '',
+          postsCount: data.postsCount || 0,
+          followerCount: data.followerCount || 0,
+          rows: data.rows || []
+        };
+        break;
+      } catch(err) {
+        if (attempts >= 3) {
+          setStep(p.handle, 0, 'error');
+          setCardState(p.handle, 'error');
+          setCardStatus(p.handle, '❌');
+          toast('Erro em @' + p.handle + ': ' + err.message, 'error');
+          result = { handle: p.handle, isMain: p.isMain, sheetId: '', sheetUrl: '', postsCount: 0, followerCount: 0, rows: [], error: err.message };
+        }
+      }
     }
-  }, 1000)
 
+    if (result) profileResults.push(result);
+    done++;
+  }
+
+  // Report step
+  updateOverall(done, total + 1, 'Gerando relatório...');
+  document.getElementById('report-step-wrap').classList.remove('hidden');
+
+  let docUrl = null;
+  let docTitle = null;
   try {
-    const res = await fetch(c.webhookUrl, {
+    const resp = await fetch(c.webhook2Url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile, posts, apifyKey: activeKey.key, geminiKey: c.geminiKey, sheetId: c.sheetId })
-    })
-
-    const data = await res.json()
-    clearInterval(_timerInterval)
-
-    if (!res.ok || data.error) {
-      const errMsg = data.message || data.error || `HTTP ${res.status}`
-      if (errMsg === 'APIFY_CREDIT_EXHAUSTED' || errMsg.includes('APIFY_CREDIT')) {
-        markExhausted(activeKey.key)
-        setStep('apify', 'error', 'Créditos esgotados — próxima chave ativada automaticamente')
-        document.getElementById('progress-title').textContent = '⚠️ Chave Apify esgotada'
-        resetUI(btn); return
-      }
-      throw new Error(errMsg)
-    }
-
-    document.getElementById('timer-apify').style.display = 'none'
-    setStep('apify', 'done', `${data.postsCount || posts} posts coletados`)
-    setStep('gemini', 'done', 'Classificação concluída')
-    setStep('sheets', 'done', 'Dados salvos com sucesso')
-    document.getElementById('progress-title').textContent = `✅ @${profile} concluído!`
-
-    document.getElementById('result-box').style.display = 'block'
-    document.getElementById('result-link').href = data.sheetUrl
-    document.getElementById('result-meta').textContent = `${data.postsCount || posts} posts · ${new Date().toLocaleDateString('pt-BR')}`
-
-    const c2 = cfg()
-    c2.history.push({ profile, posts: data.postsCount || posts, url: data.sheetUrl, date: new Date().toLocaleDateString('pt-BR') })
-    saveCfg(c2)
-
-  } catch (err) {
-    clearInterval(_timerInterval)
-    setStep('apify', 'error', err.message)
-    document.getElementById('progress-title').textContent = '❌ Erro no processamento'
+      body: JSON.stringify({
+        projectName,
+        mainProfile: mainHandle,
+        profiles: profileResults,
+        geminiKey: c.geminiKey,
+        registrySheetId: c.registrySheetId || ''
+      }),
+      signal: AbortSignal.timeout(300000)
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.message || 'Erro ao gerar relatório');
+    docUrl = data.docUrl;
+    docTitle = data.docTitle;
+  } catch(err) {
+    toast('Erro no relatório: ' + err.message, 'error');
   }
 
-  resetUI(btn)
-}
+  done++;
+  updateOverall(done, total + 1, docUrl ? 'Concluído! ✅' : 'Concluído com erros ⚠️');
+  document.getElementById('report-step-wrap').classList.add('hidden');
 
-function setStep(id, status, sub) {
-  const el = document.getElementById('step-' + id)
-  el.className = 'step s-' + status
-  const icons = { active: '', done: '✅', error: '❌', pending: '⏳' }
-  const iconEl = el.querySelector('.step-icon')
-  if (status === 'active') iconEl.innerHTML = '<div class="spinner"></div>'
-  else iconEl.textContent = icons[status]
-  if (sub !== undefined) document.getElementById('step-' + id + '-sub').textContent = sub
-}
+  // Save to history
+  const c2 = cfg();
+  c2.history.unshift({
+    id: Date.now(),
+    date: new Date().toLocaleDateString('pt-BR'),
+    time: new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }),
+    projectName,
+    mainProfile: mainHandle,
+    benchmarks: benchHandles,
+    totalProfiles: profileResults.length,
+    docUrl: docUrl || '',
+    profiles: profileResults.map(p => ({ handle: p.handle, isMain: p.isMain, sheetUrl: p.sheetUrl, postsCount: p.postsCount }))
+  });
+  if (c2.history.length > 50) c2.history = c2.history.slice(0, 50);
+  saveCfg(c2);
 
-function markExhausted(key) {
-  const c = cfg()
-  const k = c.apifyKeys.find(x => x.key === key)
-  if (k) { k.status = 'exhausted'; promoteNextKey(c) }
-  saveCfg(c)
-}
-
-function resetUI(btn) {
-  btn.disabled = false; btn.innerHTML = '▶ Gerar Relatório'
-}
-
-// ── Init ───────────────────────────────────────────────────
-;(function init() {
-  const c = cfg()
-  let changed = false
-  // Pré-carrega webhook URL se ainda não configurado
-  if (!c.webhookUrl) {
-    c.webhookUrl = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-scraper'
-    changed = true
+  // Show result
+  const rw = document.getElementById('result-wrap');
+  rw.classList.remove('hidden');
+  if (docUrl) {
+    rw.innerHTML =
+      '<div class="result-card">' +
+        '<h3>✅ Relatório gerado com sucesso!</h3>' +
+        '<div class="text-muted">' + esc(projectName) + ' · ' + new Date().toLocaleDateString('pt-BR') + '</div>' +
+        '<a href="' + esc(docUrl) + '" target="_blank" class="result-link">📄 Abrir Relatório no Google Docs</a>' +
+        '<div class="mt16"><button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="resetForm()">＋ Nova Análise</button></div>' +
+      '</div>';
+  } else {
+    rw.innerHTML =
+      '<div class="result-card" style="border-color:var(--yellow)">' +
+        '<h3 style="color:var(--yellow)">⚠️ Dados coletados, relatório falhou</h3>' +
+        '<p class="text-muted" style="margin-top:8px;">As planilhas foram criadas. Verifique as configurações do Webhook 2 e tente novamente.</p>' +
+        '<div class="mt16"><button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="resetForm()">⟳ Nova Análise</button></div>' +
+      '</div>';
   }
-  if (changed) saveCfg(c)
-})()
+}
+
+// ---- RESET ----
+function resetForm() {
+  document.getElementById('form-section').classList.remove('hidden');
+  const ps = document.getElementById('progress-section');
+  ps.classList.remove('visible');
+  ps.style.display = '';
+  document.getElementById('profiles-progress').innerHTML = '';
+  document.getElementById('report-step-wrap').classList.add('hidden');
+  document.getElementById('result-wrap').classList.add('hidden');
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('btn-start').disabled = false;
+}
+
+// ---- HISTORY ----
+function renderHistory() {
+  const c = cfg();
+  const list = document.getElementById('history-list');
+  if (!c.history || c.history.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>Nenhuma análise realizada ainda.</div></div>';
+    return;
+  }
+  list.innerHTML = c.history.map(h =>
+    '<div class="history-item">' +
+      '<div class="hi-header">' +
+        '<div>' +
+          '<div class="hi-title">📁 ' + esc(h.projectName) + '</div>' +
+          '<div class="hi-handles">⭐ @' + esc(h.mainProfile) + (h.benchmarks && h.benchmarks.length ? ' · ' + h.benchmarks.map(b => '@' + esc(b)).join(', ') : '') + '</div>' +
+        '</div>' +
+        '<div class="hi-date">' + esc(h.date) + (h.time ? ' ' + h.time : '') + '</div>' +
+      '</div>' +
+      '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">' +
+        '<span class="text-muted">' + (h.totalProfiles || 0) + ' perfis · ' + (h.profiles || []).reduce((s,p) => s + (p.postsCount || 0), 0) + ' posts</span>' +
+        (h.docUrl ? '<a class="hi-link" href="' + esc(h.docUrl) + '" target="_blank">📄 Abrir relatório</a>' : '') +
+      '</div>' +
+      (h.profiles && h.profiles.length ? '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' + h.profiles.map(p => p.sheetUrl ? '<a class="sheet-link" href="' + esc(p.sheetUrl) + '" target="_blank">' + (p.isMain ? '⭐' : '📊') + ' @' + esc(p.handle) + '</a>' : '').join('') + '</div>' : '') +
+    '</div>'
+  ).join('');
+}
+function clearHistory() {
+  if (!confirm('Limpar todo o histórico?')) return;
+  const c = cfg(); c.history = []; saveCfg(c);
+  renderHistory();
+  toast('Histórico limpo');
+}
+
+// ---- SETTINGS ----
+function renderSettings() {
+  const c = cfg();
+  document.getElementById('gemini-key').value = c.geminiKey || '';
+  document.getElementById('webhook1-url').value = c.webhook1Url || '';
+  document.getElementById('webhook2-url').value = c.webhook2Url || '';
+  document.getElementById('registry-sheet-id').value = c.registrySheetId || '';
+  renderApifyKeys();
+}
+function renderApifyKeys() {
+  const c = cfg();
+  const list = document.getElementById('apify-keys-list');
+  if (!c.apifyKeys || !c.apifyKeys.length) {
+    list.innerHTML = '<div class="text-muted" style="margin-bottom:10px;">Nenhuma chave cadastrada.</div>';
+    return;
+  }
+  list.innerHTML = c.apifyKeys.map((k, i) =>
+    '<div class="setting-row">' +
+      '<input type="password" value="' + esc(k.key) + '" readonly style="font-family:monospace;font-size:12px;" />' +
+      '<span class="key-badge ' + k.status + '">' + (k.status === 'active' ? '✅ Ativa' : k.status === 'exhausted' ? '⛔ Esgotada' : '⏳ Disponível') + '</span>' +
+      '<button class="btn btn-sm" style="background:none;border:1px solid var(--border);color:var(--muted);" onclick="removeApifyKey(' + i + ')">✕</button>' +
+    '</div>'
+  ).join('');
+}
+function addApifyKey() {
+  const input = document.getElementById('new-apify-key');
+  const key = input.value.trim();
+  if (!key) { toast('Informe a chave', 'error'); return; }
+  const c = cfg();
+  if (c.apifyKeys.find(k => k.key === key)) { toast('Chave já cadastrada', 'error'); return; }
+  const hasActive = c.apifyKeys.some(k => k.status === 'active');
+  c.apifyKeys.push({ key, status: hasActive ? 'unused' : 'active' });
+  saveCfg(c);
+  input.value = '';
+  renderApifyKeys();
+  toast('Chave adicionada!');
+}
+function removeApifyKey(index) {
+  const c = cfg();
+  const wasActive = c.apifyKeys[index]?.status === 'active';
+  c.apifyKeys.splice(index, 1);
+  if (wasActive) {
+    const next = c.apifyKeys.find(k => k.status === 'unused');
+    if (next) next.status = 'active';
+  }
+  saveCfg(c);
+  renderApifyKeys();
+}
+function saveAllSettings() {
+  const c = cfg();
+  c.geminiKey = document.getElementById('gemini-key').value.trim();
+  c.webhook1Url = document.getElementById('webhook1-url').value.trim();
+  c.webhook2Url = document.getElementById('webhook2-url').value.trim();
+  c.registrySheetId = document.getElementById('registry-sheet-id').value.trim();
+  saveCfg(c);
+  toast('Configurações salvas!');
+}
+
+// ---- UTILS ----
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- INIT ----
+;(function() {
+  addBenchmark();
+  // Pre-fill webhook defaults on first run
+  const c = cfg();
+  let changed = false;
+  if (!c.webhook1Url) {
+    c.webhook1Url = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-scraper-v2';
+    changed = true;
+  }
+  if (!c.webhook2Url) {
+    c.webhook2Url = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-report-v2';
+    changed = true;
+  }
+  if (changed) saveCfg(c);
+})();
 </script>
 </body>
 </html>
