@@ -140,6 +140,7 @@
   .text-muted { color: var(--muted); font-size: 12px; }
   .text-success { color: var(--green); }
   .text-danger { color: var(--red); }
+  .info-box { background: rgba(58,134,255,.08); border: 1px solid rgba(58,134,255,.3); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -174,7 +175,7 @@
           <span class="badge-main">⭐ Principal</span>
         </div>
         <div class="form-group">
-          <input type="text" id="main-profile" placeholder="@handle do perfil principal" />
+          <input type="text" id="main-profile" placeholder="@handle ou URL completa do Instagram" />
         </div>
 
         <hr class="divider">
@@ -250,31 +251,8 @@
     </div>
 
     <div class="card">
-      <div class="section-label" style="margin-bottom:14px;">🤖 Chave Gemini</div>
-      <input type="password" id="gemini-key" placeholder="AIza..." />
-    </div>
-
-    <div class="card">
-      <div class="section-label" style="margin-bottom:14px;">🔗 Webhooks n8n</div>
-      <div class="form-group">
-        <label>Webhook 1 — Scraper por perfil</label>
-        <input type="text" id="webhook1-url" placeholder="https://...n8n.../webhook/instagram-scraper-v2" />
-      </div>
-      <div class="form-group">
-        <label>Webhook 2 — Gerador de relatório</label>
-        <input type="text" id="webhook2-url" placeholder="https://...n8n.../webhook/instagram-report-v2" />
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="section-label" style="margin-bottom:14px;">📊 Planilha Mestre (Registro de Projetos)</div>
-      <div class="text-muted" style="margin-bottom:12px;">
-        ID da planilha Google Sheets que registra todos os projetos analisados.<br><br>
-        Crie uma planilha com uma aba chamada <strong>Projetos</strong> contendo estas colunas na linha 1:<br>
-        <code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:11px;display:inline-block;margin-top:6px;">Data | Projeto | Perfil_Principal | Benchmarks | Total_Perfis | Link_Relatorio | Titulo_Doc</code>
-      </div>
-      <input type="text" id="registry-sheet-id" placeholder="ID da planilha (extraído da URL do Google Sheets)" />
-      <div class="text-muted mt8">Deixe vazio para pular o registro. O relatório será gerado normalmente.</div>
+      <div class="section-label" style="margin-bottom:14px;">🤖 Chave IA (DeepSeek)</div>
+      <input type="password" id="gemini-key" placeholder="sk-..." />
     </div>
 
     <button class="btn btn-primary" onclick="saveAllSettings()">💾 Salvar Configurações</button>
@@ -288,7 +266,7 @@
 const STORAGE_KEY = 'ig_scraper_v2';
 
 function cfg() {
-  const d = { apifyKeys: [], geminiKey: '', webhook1Url: '', webhook2Url: '', registrySheetId: '', history: [] };
+  const d = { apifyKeys: [], geminiKey: '', history: [] };
   try { return Object.assign(d, JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')); } catch(e) { return d; }
 }
 function saveCfg(c) { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); }
@@ -330,7 +308,7 @@ function addBenchmark() {
   const row = document.createElement('div');
   row.className = 'benchmark-row';
   row.id = id;
-  row.innerHTML = '<input type="text" placeholder="@handle" class="bench-input" /><button class="btn-remove" onclick="removeBenchmark(\'' + id + '\')">✕</button>';
+  row.innerHTML = '<input type="text" placeholder="@handle ou URL do Instagram" class="bench-input" /><button class="btn-remove" onclick="removeBenchmark(\'' + id + '\')">✕</button>';
   list.appendChild(row);
   if (list.children.length >= 10) document.getElementById('btn-add-bench').style.display = 'none';
 }
@@ -340,6 +318,38 @@ function removeBenchmark(id) {
 }
 function getBenchHandles() {
   return Array.from(document.querySelectorAll('.bench-input')).map(i => normalizeHandle(i.value)).filter(h => h);
+}
+
+// ---- REMOTE CONFIG (Cloudflare KV) ----
+async function loadRemoteConfig() {
+  try {
+    const resp = await fetch('/api/config');
+    if (!resp.ok) return;
+    const remote = await resp.json();
+    if (remote.error) return;
+    const c = cfg();
+    // Gemini: KV vence sempre (campo simples)
+    if (remote.geminiKey !== undefined) c.geminiKey = remote.geminiKey;
+    // Apify: só sobrescreve se o KV tiver chaves (evita apagar localStorage com array vazio)
+    if (Array.isArray(remote.apifyKeys) && remote.apifyKeys.length > 0) {
+      c.apifyKeys = remote.apifyKeys;
+    }
+    saveCfg(c);
+    if (document.getElementById('tab-config').classList.contains('active')) renderSettings();
+  } catch(e) { /* offline ou erro — usa localStorage */ }
+}
+async function saveRemoteConfig() {
+  try {
+    const c = cfg();
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        geminiKey: c.geminiKey || '',
+        apifyKeys: c.apifyKeys || [],
+      }),
+    });
+  } catch(e) { /* silencioso */ }
 }
 
 // ---- APIFY KEY ROTATION ----
@@ -356,8 +366,8 @@ function markKeyExhausted(usedKey) {
   const k = c.apifyKeys.find(k => k.key === usedKey);
   if (k) k.status = 'exhausted';
   const next = c.apifyKeys.find(k => k.status === 'unused');
-  if (next) { next.status = 'active'; saveCfg(c); return next.key; }
-  saveCfg(c);
+  if (next) { next.status = 'active'; saveCfg(c); saveRemoteConfig(); return next.key; }
+  saveCfg(c); saveRemoteConfig();
   return null;
 }
 
@@ -384,6 +394,31 @@ function updateOverall(done, total, label) {
   document.getElementById('progress-bar').style.width = (total > 0 ? Math.round(done / total * 100) : 0) + '%';
 }
 
+// ---- ASYNC HELPERS ----
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Poll a status endpoint until status === 'done' or 'error', or timeout.
+async function pollStatus(endpoint, jobId, timeoutMs) {
+  const deadline = Date.now() + (timeoutMs || 480000);
+  while (Date.now() < deadline) {
+    await sleep(4000);
+    try {
+      const resp = await fetch(endpoint + '?jobId=' + encodeURIComponent(jobId));
+      if (!resp.ok) continue; // transient network error, retry
+      const data = await resp.json();
+      if (data.status === 'done') return data.result;
+      if (data.status === 'error') throw new Error(data.error || 'Erro no processamento');
+      // status === 'pending' or 'not_found' → keep waiting
+    } catch(e) {
+      if (e.message && e.message !== 'Failed to fetch') throw e; // real error
+      // network hiccup, retry
+    }
+  }
+  throw new Error('Timeout: o processamento demorou demais. Tente novamente.');
+}
+
 // ---- MAIN: START ANALYSIS ----
 async function startAnalysis() {
   const c = cfg();
@@ -394,8 +429,6 @@ async function startAnalysis() {
 
   if (!projectName) { toast('Informe o nome do projeto', 'error'); return; }
   if (!mainHandle) { toast('Informe o perfil principal', 'error'); return; }
-  if (!c.webhook1Url) { toast('Configure o Webhook 1 nas Configurações', 'error'); return; }
-  if (!c.webhook2Url) { toast('Configure o Webhook 2 nas Configurações', 'error'); return; }
   if (!c.geminiKey) { toast('Configure a chave Gemini nas Configurações', 'error'); return; }
   if (!getActiveApifyKey()) { toast('Nenhuma chave Apify disponível. Adicione nas Configurações.', 'error'); return; }
 
@@ -445,26 +478,38 @@ async function startAnalysis() {
 
     while (attempts < 3) {
       attempts++;
+      // Timers for approximate step animation
+      let t1 = null, t2 = null;
       try {
-        const resp = await fetch(c.webhook1Url, {
+        // POST to same-origin proxy — no CORS, no timeout issues
+        const startResp = await fetch('/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectName, profile: p.handle, posts, apifyKey, geminiKey: c.geminiKey }),
-          signal: AbortSignal.timeout(370000)
         });
 
-        if (resp.status === 402 || resp.status === 429) {
+        if (!startResp.ok) throw new Error('Erro ao iniciar coleta: HTTP ' + startResp.status);
+        const startData = await startResp.json();
+        if (startData.error) throw new Error(startData.error);
+
+        const { jobId } = startData;
+
+        // Animate chips approximately (Apify ~30s, Gemini ~60s, Sheets ~5s)
+        t1 = setTimeout(() => { setStep(p.handle, 0, 'done'); setStep(p.handle, 1, 'active'); }, 35000);
+        t2 = setTimeout(() => { setStep(p.handle, 1, 'done'); setStep(p.handle, 2, 'active'); }, 100000);
+
+        // Poll until n8n callback delivers the result
+        const data = await pollStatus('/api/scrape-status', jobId, 480000);
+
+        clearTimeout(t1); clearTimeout(t2);
+
+        // Handle Apify credit exhaustion signalled by n8n
+        if (data && data.error && String(data.message || '').includes('APIFY_CREDIT_EXHAUSTED')) {
           const next = markKeyExhausted(apifyKey);
           if (next) { apifyKey = next; continue; }
           throw new Error('Créditos Apify esgotados. Adicione mais chaves nas Configurações.');
         }
-
-        const data = await resp.json();
-        if (data.error || (data.message && data.message.includes('APIFY_CREDIT_EXHAUSTED'))) {
-          const next = markKeyExhausted(apifyKey);
-          if (next && data.message && data.message.includes('APIFY_CREDIT_EXHAUSTED')) { apifyKey = next; continue; }
-          if (data.error) throw new Error(data.message || 'Erro no workflow de scraping');
-        }
+        if (data && data.error) throw new Error(data.message || 'Erro no workflow de scraping');
 
         setStep(p.handle, 0, 'done');
         setStep(p.handle, 1, 'done');
@@ -483,6 +528,7 @@ async function startAnalysis() {
         };
         break;
       } catch(err) {
+        clearTimeout(t1); clearTimeout(t2);
         if (attempts >= 3) {
           setStep(p.handle, 0, 'error');
           setCardState(p.handle, 'error');
@@ -504,7 +550,7 @@ async function startAnalysis() {
   let docUrl = null;
   let docTitle = null;
   try {
-    const resp = await fetch(c.webhook2Url, {
+    const startResp = await fetch('/api/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -512,12 +558,14 @@ async function startAnalysis() {
         mainProfile: mainHandle,
         profiles: profileResults,
         geminiKey: c.geminiKey,
-        registrySheetId: c.registrySheetId || ''
       }),
-      signal: AbortSignal.timeout(300000)
     });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.message || 'Erro ao gerar relatório');
+    const startData = await startResp.json();
+    if (startData.error) throw new Error(startData.error);
+
+    const { jobId } = startData;
+    const data = await pollStatus('/api/report-status', jobId, 360000);
+    if (data && data.error) throw new Error(data.message || 'Erro ao gerar relatório');
     docUrl = data.docUrl;
     docTitle = data.docTitle;
   } catch(err) {
@@ -614,9 +662,6 @@ function clearHistory() {
 function renderSettings() {
   const c = cfg();
   document.getElementById('gemini-key').value = c.geminiKey || '';
-  document.getElementById('webhook1-url').value = c.webhook1Url || '';
-  document.getElementById('webhook2-url').value = c.webhook2Url || '';
-  document.getElementById('registry-sheet-id').value = c.registrySheetId || '';
   renderApifyKeys();
 }
 function renderApifyKeys() {
@@ -634,7 +679,7 @@ function renderApifyKeys() {
     '</div>'
   ).join('');
 }
-function addApifyKey() {
+async function addApifyKey() {
   const input = document.getElementById('new-apify-key');
   const key = input.value.trim();
   if (!key) { toast('Informe a chave', 'error'); return; }
@@ -645,9 +690,11 @@ function addApifyKey() {
   saveCfg(c);
   input.value = '';
   renderApifyKeys();
-  toast('Chave adicionada!');
+  toast('Salvando...');
+  await saveRemoteConfig();
+  toast('Chave adicionada e salva! ✅');
 }
-function removeApifyKey(index) {
+async function removeApifyKey(index) {
   const c = cfg();
   const wasActive = c.apifyKeys[index]?.status === 'active';
   c.apifyKeys.splice(index, 1);
@@ -657,15 +704,19 @@ function removeApifyKey(index) {
   }
   saveCfg(c);
   renderApifyKeys();
+  await saveRemoteConfig();
 }
-function saveAllSettings() {
+async function saveAllSettings() {
+  // Auto-adiciona chave Apify pendente no campo de texto (se houver)
+  const pendingApify = document.getElementById('new-apify-key').value.trim();
+  if (pendingApify) await addApifyKey();
+
   const c = cfg();
   c.geminiKey = document.getElementById('gemini-key').value.trim();
-  c.webhook1Url = document.getElementById('webhook1-url').value.trim();
-  c.webhook2Url = document.getElementById('webhook2-url').value.trim();
-  c.registrySheetId = document.getElementById('registry-sheet-id').value.trim();
   saveCfg(c);
-  toast('Configurações salvas!');
+  toast('Salvando...');
+  await saveRemoteConfig();
+  toast('Configurações salvas! ✅');
 }
 
 // ---- UTILS ----
@@ -674,20 +725,9 @@ function esc(s) {
 }
 
 // ---- INIT ----
-;(function() {
+;(async function() {
   addBenchmark();
-  // Pre-fill webhook defaults on first run
-  const c = cfg();
-  let changed = false;
-  if (!c.webhook1Url) {
-    c.webhook1Url = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-scraper-v2';
-    changed = true;
-  }
-  if (!c.webhook2Url) {
-    c.webhook2Url = 'https://minispectacledbear-n8n.cloudfy.live/webhook/instagram-report-v2';
-    changed = true;
-  }
-  if (changed) saveCfg(c);
+  await loadRemoteConfig(); // carrega config do KV (geminiKey, apifyKeys, registrySheetId)
 })();
 </script>
 </body>

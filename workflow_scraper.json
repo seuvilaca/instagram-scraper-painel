@@ -16,13 +16,26 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst required = ['projectName','profile','posts','apifyKey','geminiKey'];\nfor (const f of required) { if (!b[f]) throw new Error('Campo obrigatorio: ' + f); }\nb.posts = Math.min(parseInt(b.posts) || 12, 100);\n// aceita URL completa, @handle ou handle\nfunction normalizeHandle(input) {\n  const urlMatch = (input||'').match(/instagram\\.com\\/([^/?#\\s]+)/i);\n  if (urlMatch) return urlMatch[1];\n  return (input||'').replace(/^@/,'').trim();\n}\nb.handle = normalizeHandle(b.profile);\nb.profile = b.handle;\nif (!b.handle) throw new Error('profile invalido');\nreturn [{ json: b }];"
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst required = ['projectName','profile','posts','apifyKey','geminiKey'];\nfor (const f of required) { if (!b[f]) throw new Error('Campo obrigatorio: ' + f); }\nb.posts = Math.min(parseInt(b.posts) || 12, 100);\nfunction normalizeHandle(input) {\n  const urlMatch = (input||'').match(/instagram\\.com\\/([^/?#\\s]+)/i);\n  if (urlMatch) return urlMatch[1];\n  return (input||'').replace(/^@/,'').trim();\n}\nb.handle = normalizeHandle(b.profile);\nb.profile = b.handle;\nif (!b.handle) throw new Error('profile invalido');\nreturn [{ json: b }];"
       },
       "id": "s-node-02",
       "name": "Validar Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"accepted\",\"jobId\":\"{{ $json.jobId || '' }}\"}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "s-node-ack",
+      "name": "Responder Imediato",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [640, 520],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -58,10 +71,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const { rows, geminiKey, profile, projectName, postsCount, followerCount } = $input.first().json;\n\nconst legends = rows.map((r, i) => `[${i+1}] Perfil: ${r.perfil} | Formato: ${r.formato} | Legenda: \"${r.legenda || '(sem legenda)'}\"`);\n\nconst prompt = `Você é especialista em análise de conteúdo de marcas e negócios no Instagram.\\n\\nAnalise os ${rows.length} posts abaixo e classifique cada um com:\\n- tema: categoria principal do conteúdo (seja específico e descritivo, ex: \\\"Apresentação de produto / Lançamento\\\", \\\"Bastidores / Cultura da empresa\\\", \\\"Depoimento de cliente / Prova social\\\", \\\"Dica educativa / Conteúdo de valor\\\", \\\"Promoção / Oferta especial\\\", \\\"Evento / Celebração\\\", etc.)\\n- tom: como o conteúdo se comunica (ex: \\\"Inspiracional e motivacional\\\", \\\"Informativo e educativo\\\", \\\"Emocional e afetivo\\\", \\\"Comercial e persuasivo\\\", \\\"Descontraído e bem-humorado\\\", etc.)\\n\\nRetorne SOMENTE um array JSON válido com ${rows.length} objetos {\\\"tema\\\":\\\"...\\\",\\\"tom\\\":\\\"...\\\"}, na mesma ordem dos posts. Sem texto adicional.\\n\\nPosts:\\n${legends.join('\\\\n')}`;\n\nreturn [{ json: { prompt, rows, geminiKey, profile, projectName, postsCount, followerCount } }];"
+        "jsCode": "const { rows, geminiKey, profile, projectName, postsCount, followerCount } = $input.first().json;\n\nconst legends = rows.map((r, i) => `[${i+1}] Perfil: ${r.perfil} | Formato: ${r.formato} | Legenda: \"${r.legenda || '(sem legenda)'}\"`);\n\nconst prompt = `Você é especialista em análise de conteúdo de marcas e negócios no Instagram.\\n\\nAnalise os ${rows.length} posts abaixo e classifique cada um com:\\n- tema: categoria principal do conteúdo (seja específico e descritivo, ex: \\\"Apresentação de produto / Lançamento\\\", \\\"Bastidores / Cultura da empresa\\\", \\\"Depoimento de cliente / Prova social\\\", \\\"Dica educativa / Conteúdo de valor\\\", \\\"Promoção / Oferta especial\\\", \\\"Evento / Celebração\\\", etc.)\\n- tom: como o conteúdo se comunica (ex: \\\"Inspiracional e motivacional\\\", \\\"Informativo e educativo\\\", \\\"Emocional e afetivo\\\", \\\"Comercial e persuasivo\\\", \\\"Descontraído e bem-humorado\\\", etc.)\\n\\nRetorne SOMENTE um array JSON válido com ${rows.length} objetos {\\\"tema\\\":\\\"...\\\",\\\"tom\\\":\\\"...\\\"}, na mesma ordem dos posts. Sem texto adicional, sem markdown, sem blocos de código.\\n\\nPosts:\\n${legends.join('\\\\n')}`;\n\nreturn [{ json: { prompt, rows, geminiKey, profile, projectName, postsCount, followerCount } }];"
       },
       "id": "s-node-05",
-      "name": "Preparar Prompt Gemini",
+      "name": "Preparar Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1080, 300]
@@ -69,23 +82,28 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={{ $json.geminiKey }}",
+        "url": "https://api.deepseek.com/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.geminiKey }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{ \"text\": {{ JSON.stringify($json.prompt) }} }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
-        "options": {
-          "timeout": 120000
-        }
+        "jsonBody": "={\n  \"model\": \"deepseek-chat\",\n  \"messages\": [{\"role\": \"user\", \"content\": {{ JSON.stringify($json.prompt) }}}],\n  \"temperature\": 0.1,\n  \"max_tokens\": 8192\n}",
+        "options": { "timeout": 120000 }
       },
       "id": "s-node-06",
-      "name": "Gemini - Classificar",
+      "name": "DeepSeek - Classificar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1300, 300]
     },
     {
       "parameters": {
-        "jsCode": "const geminiResponse = $input.first().json;\nconst { rows, profile, projectName, postsCount, followerCount } = $('Preparar Prompt Gemini').first().json;\n\nlet classifications = [];\ntry {\n  const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\n  classifications = JSON.parse(text);\n} catch(e) {\n  classifications = rows.map(() => ({ tema: 'Conteúdo geral', tom: 'Informativo' }));\n}\n\nconst finalRows = rows.map((r, i) => ({\n  Perfil: r.perfil,\n  Link: r.link,\n  Formato: r.formato,\n  Data: r.data,\n  Curtidas: r.curtidas,\n  Comentarios: r.comentarios,\n  Legenda: r.legenda,\n  Tema: classifications[i]?.tema || 'Sem classificação',\n  Tom_de_Voz: classifications[i]?.tom || '—',\n  _projectName: projectName,\n  _followerCount: followerCount\n}));\n\nreturn finalRows.map(row => ({ json: row }));"
+        "jsCode": "const aiResponse = $input.first().json;\nconst { rows, profile, projectName, postsCount, followerCount } = $('Preparar Prompt').first().json;\n\nlet classifications = [];\ntry {\n  let text = aiResponse.choices?.[0]?.message?.content || '[]';\n  // Remove markdown code blocks if present\n  text = text.replace(/^```[\\w]*\\n?/,'').replace(/\\n?```$/,'').trim();\n  classifications = JSON.parse(text);\n} catch(e) {\n  classifications = rows.map(() => ({ tema: 'Conteúdo geral', tom: 'Informativo' }));\n}\n\nconst finalRows = rows.map((r, i) => ({\n  Perfil: r.perfil,\n  Link: r.link,\n  Formato: r.formato,\n  Data: r.data,\n  Curtidas: r.curtidas,\n  Comentarios: r.comentarios,\n  Legenda: r.legenda,\n  Tema: classifications[i]?.tema || 'Sem classificação',\n  Tom_de_Voz: classifications[i]?.tom || '—',\n  _projectName: projectName,\n  _followerCount: followerCount\n}));\n\nreturn finalRows.map(row => ({ json: row }));"
       },
       "id": "s-node-07",
       "name": "Mesclar Resultados",
@@ -171,27 +189,29 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
-        "options": {}
+        "jsCode": "const vars = $('Validar Input').first().json;\nconst callbackUrl = vars.callbackUrl || '';\nconst jobId = vars.jobId || '';\nif (!callbackUrl || !jobId) return [];\nconst result = $input.first().json;\nreturn [{ json: { callbackUrl, jobId, result } }];"
       },
       "id": "s-node-13",
-      "name": "Responder Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
+      "name": "Preparar Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [2840, 300]
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ error: true, message: $json.message || 'Erro interno' }) }}",
-        "options": { "responseCode": 500 }
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jobId\": {{ JSON.stringify($json.jobId) }},\n  \"result\": {{ JSON.stringify($json.result) }}\n}",
+        "options": { "timeout": 10000 }
       },
-      "id": "s-node-err",
-      "name": "Responder Erro",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [860, 520]
+      "id": "s-node-14",
+      "name": "Enviar Callback",
+      "continueOnFail": true,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3060, 300]
     }
   ],
   "connections": {
@@ -199,18 +219,23 @@
       "main": [[{ "node": "Validar Input", "type": "main", "index": 0 }]]
     },
     "Validar Input": {
-      "main": [[{ "node": "Apify - Coletar Posts", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          { "node": "Responder Imediato", "type": "main", "index": 0 },
+          { "node": "Apify - Coletar Posts", "type": "main", "index": 0 }
+        ]
+      ]
     },
     "Apify - Coletar Posts": {
       "main": [[{ "node": "Mapear Posts", "type": "main", "index": 0 }]]
     },
     "Mapear Posts": {
-      "main": [[{ "node": "Preparar Prompt Gemini", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Preparar Prompt", "type": "main", "index": 0 }]]
     },
-    "Preparar Prompt Gemini": {
-      "main": [[{ "node": "Gemini - Classificar", "type": "main", "index": 0 }]]
+    "Preparar Prompt": {
+      "main": [[{ "node": "DeepSeek - Classificar", "type": "main", "index": 0 }]]
     },
-    "Gemini - Classificar": {
+    "DeepSeek - Classificar": {
       "main": [[{ "node": "Mesclar Resultados", "type": "main", "index": 0 }]]
     },
     "Mesclar Resultados": {
@@ -229,7 +254,10 @@
       "main": [[{ "node": "Montar Resposta", "type": "main", "index": 0 }]]
     },
     "Montar Resposta": {
-      "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Preparar Callback", "type": "main", "index": 0 }]]
+    },
+    "Preparar Callback": {
+      "main": [[{ "node": "Enviar Callback", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
