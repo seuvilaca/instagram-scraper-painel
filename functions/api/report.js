@@ -55,11 +55,18 @@ export async function onRequestPost(context) {
       );
     }
   } catch (err) {
-    await env.JOBS.put(
-      `report:${jobId}`,
-      JSON.stringify({ status: 'error', error: 'n8n inacessível: ' + err.message }),
-      { expirationTtl: 7200 }
-    );
+    // Se for timeout do AbortSignal, o n8n pode ainda estar rodando.
+    // Não grava erro — mantém 'pending' para o frontend continuar polling
+    // até o callback chegar (n8n leva ~45s no total).
+    const isTimeout = err.name === 'TimeoutError' || err.message.includes('aborted');
+    if (!isTimeout) {
+      await env.JOBS.put(
+        `report:${jobId}`,
+        JSON.stringify({ status: 'error', error: 'n8n inacessível: ' + err.message }),
+        { expirationTtl: 7200 }
+      );
+    }
+    // Se for timeout: KV continua como 'pending', callback do n8n vai atualizar depois
   }
 
   return new Response(JSON.stringify({ jobId, status: 'pending' }), {
