@@ -43,7 +43,7 @@ export async function onRequestPost(context) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, jobId, callbackUrl, registrySheetId: REGISTRY_SHEET_ID }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!n8nResp.ok) {
