@@ -313,6 +313,14 @@ function toast(msg, type) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ---- NORMALIZE HANDLE (aceita @handle, handle ou URL completa) ----
+function normalizeHandle(input) {
+  input = (input || '').trim();
+  const urlMatch = input.match(/instagram\.com\/([^/?#\s]+)/i);
+  if (urlMatch) return urlMatch[1];
+  return input.replace(/^@/, '').trim();
+}
+
 // ---- BENCHMARKS ----
 let benchCnt = 0;
 function addBenchmark() {
@@ -331,7 +339,7 @@ function removeBenchmark(id) {
   document.getElementById('btn-add-bench').style.display = '';
 }
 function getBenchHandles() {
-  return Array.from(document.querySelectorAll('.bench-input')).map(i => i.value.replace(/^@/,'').trim()).filter(h => h);
+  return Array.from(document.querySelectorAll('.bench-input')).map(i => normalizeHandle(i.value)).filter(h => h);
 }
 
 // ---- APIFY KEY ROTATION ----
@@ -380,7 +388,7 @@ function updateOverall(done, total, label) {
 async function startAnalysis() {
   const c = cfg();
   const projectName = document.getElementById('project-name').value.trim();
-  const mainHandle = document.getElementById('main-profile').value.replace(/^@/,'').trim();
+  const mainHandle = normalizeHandle(document.getElementById('main-profile').value);
   const benchHandles = getBenchHandles();
   const posts = parseInt(document.getElementById('posts-range').value) || 30;
 

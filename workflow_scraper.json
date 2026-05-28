@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst required = ['projectName','profile','posts','apifyKey','geminiKey'];\nfor (const f of required) { if (!b[f]) throw new Error('Campo obrigatorio: ' + f); }\nb.posts = Math.min(parseInt(b.posts) || 12, 100);\nb.handle = (b.profile || '').replace(/^@/, '').trim();\nb.profile = b.handle;\nif (!b.handle) throw new Error('profile invalido');\nreturn [{ json: b }];"
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst required = ['projectName','profile','posts','apifyKey','geminiKey'];\nfor (const f of required) { if (!b[f]) throw new Error('Campo obrigatorio: ' + f); }\nb.posts = Math.min(parseInt(b.posts) || 12, 100);\n// aceita URL completa, @handle ou handle\nfunction normalizeHandle(input) {\n  const urlMatch = (input||'').match(/instagram\\.com\\/([^/?#\\s]+)/i);\n  if (urlMatch) return urlMatch[1];\n  return (input||'').replace(/^@/,'').trim();\n}\nb.handle = normalizeHandle(b.profile);\nb.profile = b.handle;\nif (!b.handle) throw new Error('profile invalido');\nreturn [{ json: b }];"
       },
       "id": "s-node-02",
       "name": "Validar Input",
